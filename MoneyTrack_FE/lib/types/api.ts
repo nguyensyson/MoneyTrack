@@ -67,6 +67,14 @@ export interface PageResponse<T> {
   size: number;
 }
 
+// User
+export interface UserProfile {
+  id: number;
+  name: string;
+  email: string;
+  createdAt: string; // ISO-8601
+}
+
 // Statistics
 export interface SummaryStats {
   totalIncome: number;

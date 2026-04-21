@@ -1,33 +1,45 @@
 'use client';
 
 import { useState } from 'react';
-import { mockUser } from '@/lib/mock-data';
-import { Card } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChartCard } from '@/components/chart-card';
 import { User, Mail, LogOut, Edit2, Check, X } from 'lucide-react';
+import { useFetch } from '@/lib/hooks/useFetch';
+import { userApi } from '@/lib/api/users';
+import { clearAuth } from '@/lib/api/auth';
 
 export default function AccountPage() {
+  const router = useRouter();
+  const { data, loading, error } = useFetch(() => userApi.getMe());
+
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(mockUser.name);
-  const [email, setEmail] = useState(mockUser.email);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
 
   const handleSave = () => {
     setIsEditing(false);
-    // In a real app, this would update the backend
   };
 
   const handleCancel = () => {
-    setName(mockUser.name);
-    setEmail(mockUser.email);
+    setName(data?.name ?? '');
+    setEmail(data?.email ?? '');
     setIsEditing(false);
   };
 
   const handleLogout = () => {
-    // In a real app, this would handle logout
-    alert('Logout functionality would be implemented here');
+    clearAuth();
+    router.push('/login');
   };
+
+  const formattedDate = data?.createdAt
+    ? new Date(data.createdAt).toLocaleDateString('vi-VN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 sm:p-6">
@@ -50,15 +62,29 @@ export default function AccountPage() {
               </div>
             </div>
 
+            {/* Loading state */}
+            {loading && (
+              <div className="space-y-4 animate-pulse">
+                <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
+                <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+                <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-2/5" />
+              </div>
+            )}
+
+            {/* Error state */}
+            {error && (
+              <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+            )}
+
             {/* User Info */}
-            {!isEditing ? (
+            {!loading && !error && data && !isEditing ? (
               <div className="space-y-4">
                 {/* Name */}
                 <div>
                   <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
                     Họ và tên
                   </p>
-                  <p className="text-lg font-semibold text-slate-900 dark:text-white">{name}</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-white">{data.name}</p>
                 </div>
 
                 {/* Email */}
@@ -68,7 +94,7 @@ export default function AccountPage() {
                   </p>
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                    <p className="text-lg font-semibold text-slate-900 dark:text-white">{email}</p>
+                    <p className="text-lg font-semibold text-slate-900 dark:text-white">{data.email}</p>
                   </div>
                 </div>
 
@@ -78,11 +104,11 @@ export default function AccountPage() {
                     Thành viên từ
                   </p>
                   <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                    Tháng 1 năm 2024
+                    {formattedDate}
                   </p>
                 </div>
               </div>
-            ) : (
+            ) : !loading && !error && data && isEditing ? (
               <div className="space-y-4">
                 {/* Edit Name */}
                 <div>
@@ -90,7 +116,7 @@ export default function AccountPage() {
                     Họ và tên
                   </label>
                   <Input
-                    value={name}
+                    value={name || data.name}
                     onChange={(e) => setName(e.target.value)}
                     className="mt-2"
                     placeholder="Nhập tên của bạn"
@@ -104,14 +130,14 @@ export default function AccountPage() {
                   </label>
                   <Input
                     type="email"
-                    value={email}
+                    value={email || data.email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="mt-2"
                     placeholder="Nhập email của bạn"
                   />
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">

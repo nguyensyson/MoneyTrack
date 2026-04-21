@@ -14,9 +14,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { LogOut, Plus } from 'lucide-react';
+import { useFetch } from '@/lib/hooks/useFetch';
+import { userApi } from '@/lib/api/users';
+import { clearAuth } from '@/lib/api/auth';
 
 export default function AdminSettings() {
   const router = useRouter();
+  const { data: profile, loading: profileLoading } = useFetch(() => userApi.getMe());
   const [isOpen, setIsOpen] = useState(false);
   const [adminForm, setAdminForm] = useState({
     name: '',
@@ -29,7 +33,7 @@ export default function AdminSettings() {
 
   const handleLogout = () => {
     if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
-      localStorage.removeItem('user');
+      clearAuth();
       router.push('/login');
     }
   };
@@ -66,6 +70,30 @@ export default function AdminSettings() {
 
         {/* Sections Grid */}
         <div className="space-y-6">
+          {/* Account Info Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Thông tin tài khoản</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {profileLoading ? (
+                <div className="space-y-2">
+                  <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-1/3" />
+                  <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-1/2" />
+                </div>
+              ) : (
+                <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <p className="font-medium text-slate-900 dark:text-white">
+                    {profile?.name}
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {profile?.email}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Admin Accounts Section */}
           <Card>
             <CardHeader className="flex items-center justify-between">
