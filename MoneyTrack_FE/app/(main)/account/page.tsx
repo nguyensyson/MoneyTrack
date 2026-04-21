@@ -12,19 +12,37 @@ import { clearAuth } from '@/lib/api/auth';
 
 export default function AccountPage() {
   const router = useRouter();
-  const { data, loading, error } = useFetch(() => userApi.getMe());
+  const { data, loading, error, refetch } = useFetch(() => userApi.getMe());
 
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [nameError, setNameError] = useState('');
+  const [saveError, setSaveError] = useState('');
 
-  const handleSave = () => {
-    setIsEditing(false);
+  const handleSave = async () => {
+    if (name.trim() === '') {
+      setNameError('Tên không được để trống');
+      return;
+    }
+    setNameError('');
+    setSaveError('');
+    setSubmitting(true);
+    try {
+      await userApi.updateMe({ name: name.trim() });
+      refetch();
+      setIsEditing(false);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Đã xảy ra lỗi';
+      setSaveError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
-    setName(data?.name ?? '');
-    setEmail(data?.email ?? '');
+    setNameError('');
+    setSaveError('');
     setIsEditing(false);
   };
 
@@ -116,26 +134,33 @@ export default function AccountPage() {
                     Họ và tên
                   </label>
                   <Input
-                    value={name || data.name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setNameError(''); }}
                     className="mt-2"
                     placeholder="Nhập tên của bạn"
                   />
+                  {nameError && (
+                    <p className="text-sm text-red-500 mt-1">{nameError}</p>
+                  )}
                 </div>
 
-                {/* Edit Email */}
+                {/* Edit Email (read-only) */}
                 <div>
                   <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Địa chỉ email
                   </label>
                   <Input
                     type="email"
-                    value={email || data.email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="mt-2"
-                    placeholder="Nhập email của bạn"
+                    value={data.email}
+                    disabled
+                    className="mt-2 opacity-60 cursor-not-allowed"
                   />
                 </div>
+
+                {/* Save error */}
+                {saveError && (
+                  <p className="text-sm text-red-500">{saveError}</p>
+                )}
               </div>
             ) : null}
 
@@ -143,7 +168,7 @@ export default function AccountPage() {
             <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
               {!isEditing ? (
                 <Button
-                  onClick={() => setIsEditing(true)}
+                  onClick={() => { setName(data?.name ?? ''); setIsEditing(true); }}
                   variant="outline"
                   className="flex items-center gap-2"
                 >
@@ -154,10 +179,11 @@ export default function AccountPage() {
                 <>
                   <Button
                     onClick={handleSave}
+                    disabled={submitting}
                     className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
                   >
                     <Check className="w-4 h-4" />
-                    Lưu thay đổi
+                    {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
                   </Button>
                   <Button
                     onClick={handleCancel}

@@ -75,6 +75,10 @@ export interface UserProfile {
   createdAt: string; // ISO-8601
 }
 
+export interface UpdateProfileRequest {
+  name: string;
+}
+
 // Statistics
 export interface SummaryStats {
   totalIncome: number;
