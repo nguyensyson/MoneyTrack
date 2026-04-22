@@ -20,4 +20,9 @@ export const transactionsApi = {
 
   delete: (id: number) =>
     apiClient.delete(`/api/transactions/${id}`).then((r) => r.data),
+
+  exportCsv: (params: { month: string; categoryId?: number }) =>
+    apiClient
+      .get('/api/transactions/export', { params, responseType: 'blob' })
+      .then((r) => r.data as Blob),
 };

@@ -17,8 +17,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -108,6 +112,82 @@ public class TransactionService {
         Transaction transaction = getOwnedTransaction(userEmail, transactionId);
         transaction.setDeleteFlag(DeleteFlag.DELETED);
         transactionRepository.save(transaction);
+    }
+
+    public byte[] exportTransactionsCsv(String userEmail, String month, Long categoryId) {
+        List<Transaction> transactions = getTransactionsForExport(userEmail, month, categoryId);
+        return buildCsvBytes(transactions);
+    }
+
+    public byte[] buildCsvBytesPublic(List<Transaction> transactions) {
+        return buildCsvBytes(transactions);
+    }
+
+    public List<Transaction> getTransactionsForExport(String userEmail, String month, Long categoryId) {
+        YearMonth yearMonth;
+        try {
+            yearMonth = YearMonth.parse(month, DateTimeFormatter.ofPattern("yyyy-MM"));
+        } catch (DateTimeParseException e) {
+            throw new BadRequestException("Invalid month format. Expected yyyy-MM");
+        }
+
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userEmail));
+
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDate = yearMonth.atEndOfMonth();
+
+        return transactionRepository
+                .findAllByUserAndDeleteFlagAndDateRangeAndOptionalCategory(
+                        user, DeleteFlag.ACTIVE, startDate, endDate, categoryId);
+    }
+
+    public String buildExportFilename(String month, Long categoryId, List<Transaction> transactions) {
+        if (categoryId == null || transactions.isEmpty()) {
+            return "transactions_" + month + ".csv";
+        }
+        String categoryName = transactions.get(0).getCategory().getName();
+        return "transactions_" + month + "_" + categoryName + ".csv";
+    }
+
+    private byte[] buildCsvBytes(List<Transaction> transactions) {
+        // 2.2 – Header row
+        StringBuilder sb = new StringBuilder();
+
+        // UTF-8 BOM
+        sb.append('\uFEFF');
+
+        sb.append("Date,Title,Category,Type,Amount,Note\n");
+
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        for (Transaction t : transactions) {
+            String date = t.getDate().format(dateFmt);
+            String description = t.getDescription() != null ? t.getDescription() : "";
+            String title = description.isEmpty() ? t.getCategory().getName() : description;
+            String category = t.getCategory().getName();
+            String type = t.getType().name();
+            String amount = t.getAmount().toPlainString();
+            String note = description;
+
+            sb.append(escapeCsvField(date)).append(",")
+              .append(escapeCsvField(title)).append(",")
+              .append(escapeCsvField(category)).append(",")
+              .append(escapeCsvField(type)).append(",")
+              .append(escapeCsvField(amount)).append(",")
+              .append(escapeCsvField(note)).append("\n");
+        }
+
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String escapeCsvField(String value) {
+        if (value == null) return "";
+        // Wrap in quotes if the value contains comma, quote, or newline
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     private Transaction getOwnedTransaction(String userEmail, Long transactionId) {

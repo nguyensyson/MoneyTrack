@@ -9,8 +9,10 @@ import { categoriesApi } from '@/lib/api/categories';
 import { ChartCard } from '@/components/chart-card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Edit2, Plus } from 'lucide-react';
+import { Trash2, Edit2, Plus, FileDown } from 'lucide-react';
 import { TransactionModal } from '@/components/transaction-modal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import type { ApiTransaction } from '@/lib/types/api';
 
 const PAGE_SIZE = 10;
@@ -28,6 +30,11 @@ function TransactionsContent() {
   const [page, setPage] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ApiTransaction | null>(null);
+
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportState, setExportState] = useState<'loading' | 'success' | 'error'>('loading');
+  const [csvBlob, setCsvBlob] = useState<Blob | null>(null);
+  const [csvFilename, setCsvFilename] = useState<string>('');
 
   const { data: categories } = useFetch(() => categoriesApi.getAll(), []);
 
@@ -54,6 +61,41 @@ function TransactionsContent() {
     setModalOpen(false);
     setEditing(null);
     refetch();
+  };
+
+  const handleExport = async () => {
+    setExportModalOpen(true);
+    setExportState('loading');
+    setCsvBlob(null);
+
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    try {
+      const blob = await transactionsApi.exportCsv({
+        month: monthStr,
+        ...(categoryId !== undefined && { categoryId }),
+      });
+      const categoryName = categoryId
+        ? (categories ?? []).find((c) => c.id === categoryId)?.name
+        : undefined;
+      const filename = categoryName
+        ? `transactions_${monthStr}_${categoryName}.csv`
+        : `transactions_${monthStr}.csv`;
+      setCsvBlob(blob);
+      setCsvFilename(filename);
+      setExportState('success');
+    } catch {
+      setExportState('error');
+    }
+  };
+
+  const handleDownload = () => {
+    if (!csvBlob) return;
+    const url = URL.createObjectURL(csvBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = csvFilename;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -106,6 +148,15 @@ function TransactionsContent() {
               ))}
             </SelectContent>
           </Select>
+
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={exportModalOpen && exportState === 'loading'}
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
         </div>
 
         {/* List */}
@@ -197,6 +248,41 @@ function TransactionsContent() {
         onClose={() => { setModalOpen(false); setEditing(null); }}
         onSaved={handleSaved}
       />
+
+      <Dialog
+        open={exportModalOpen}
+        onOpenChange={(open) => {
+          if (!open && exportState !== 'loading') {
+            setExportModalOpen(false);
+            setExportState('loading');
+            setCsvBlob(null);
+            setCsvFilename('');
+          }
+        }}
+      >
+        <DialogContent showCloseButton={exportState !== 'loading'}>
+          <DialogHeader>
+            <DialogTitle>Export CSV</DialogTitle>
+          </DialogHeader>
+          {exportState === 'loading' && (
+            <div className="flex items-center gap-3 py-2">
+              <Spinner className="size-5" />
+              <p className="text-slate-600 dark:text-slate-400">Đang chuẩn bị file CSV... Vui lòng chờ.</p>
+            </div>
+          )}
+          {exportState === 'success' && (
+            <div className="space-y-4">
+              <p className="text-slate-700 dark:text-slate-300">File CSV đã sẵn sàng</p>
+              <Button onClick={handleDownload} className="w-full">
+                Tải file
+              </Button>
+            </div>
+          )}
+          {exportState === 'error' && (
+            <p className="text-red-500">Không thể export file. Vui lòng thử lại.</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

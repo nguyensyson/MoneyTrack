@@ -212,7 +212,7 @@ export default function AccountPage() {
               </Button>
             </div>
 
-            <div className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+            {/* <div className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
               <div>
                 <p className="font-medium text-slate-900 dark:text-white">
                   Xác thực hai yếu tố
@@ -222,7 +222,7 @@ export default function AccountPage() {
               <Button variant="outline" className="text-sm">
                 Bật
               </Button>
-            </div>
+            </div> */}
           </div>
         </ChartCard>
 

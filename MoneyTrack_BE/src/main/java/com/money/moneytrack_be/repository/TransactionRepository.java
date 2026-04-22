@@ -52,6 +52,25 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("endDate") LocalDate endDate
     );
 
+    // Non-paginated export query: all transactions for a user in a date range, with optional category filter
+    @Query("""
+            SELECT t FROM Transaction t
+            JOIN FETCH t.category c
+            WHERE t.user = :user
+              AND t.deleteFlag = :deleteFlag
+              AND t.date >= :startDate
+              AND t.date <= :endDate
+              AND (:categoryId IS NULL OR t.category.id = :categoryId)
+            ORDER BY t.date ASC
+            """)
+    List<Transaction> findAllByUserAndDeleteFlagAndDateRangeAndOptionalCategory(
+            @Param("user") User user,
+            @Param("deleteFlag") DeleteFlag deleteFlag,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("categoryId") Long categoryId
+    );
+
     // Fetch all EXPENSE transactions for a user in a date range (for parent-category grouping in stats)
     @Query("""
             SELECT t FROM Transaction t

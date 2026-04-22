@@ -9,11 +9,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/transactions")
@@ -70,5 +75,23 @@ public class TransactionController {
             @PathVariable Long id) {
         transactionService.delete(userDetails.getUsername(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportCsv(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam String month,
+            @RequestParam(required = false) Long categoryId) {
+        List<Transaction> transactions = transactionService.getTransactionsForExport(
+                userDetails.getUsername(), month, categoryId);
+        byte[] csvBytes = transactionService.buildCsvBytesPublic(transactions);
+        String filename = transactionService.buildExportFilename(month, categoryId, transactions);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/csv"));
+        headers.setContentDisposition(
+                ContentDisposition.attachment().filename(filename).build());
+
+        return ResponseEntity.ok().headers(headers).body(csvBytes);
     }
 }
