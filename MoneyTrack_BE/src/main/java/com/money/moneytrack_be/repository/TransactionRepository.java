@@ -1,5 +1,6 @@
 package com.money.moneytrack_be.repository;
 
+import com.money.moneytrack_be.dto.response.MonthlyTransactionCountProjection;
 import com.money.moneytrack_be.entity.Transaction;
 import com.money.moneytrack_be.entity.User;
 import com.money.moneytrack_be.enums.DeleteFlag;
@@ -88,5 +89,18 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("deleteFlag") DeleteFlag deleteFlag,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
+    );
+
+    // Count active transactions grouped by month (for admin monthly usage chart)
+    @Query("""
+            SELECT FUNCTION('DATE_FORMAT', t.date, '%Y-%m') AS yearMonth,
+                   COUNT(t) AS count
+            FROM Transaction t
+            WHERE t.deleteFlag = :deleteFlag
+            GROUP BY FUNCTION('DATE_FORMAT', t.date, '%Y-%m')
+            ORDER BY yearMonth ASC
+            """)
+    List<MonthlyTransactionCountProjection> countActiveTransactionsByMonth(
+            @Param("deleteFlag") DeleteFlag deleteFlag
     );
 }

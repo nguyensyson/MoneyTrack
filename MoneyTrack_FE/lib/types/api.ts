@@ -78,6 +78,12 @@ export interface UpdateProfileRequest {
   name: string;
 }
 
+// Admin Statistics
+export interface MonthlyTransactionCount {
+  month: string; // "yyyy-MM", e.g. "2026-01"
+  count: number;
+}
+
 // Statistics
 export interface SummaryStats {
   totalIncome: number;
