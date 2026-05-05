@@ -49,6 +49,7 @@ export default function MonthlyUsageChart({ data }: MonthlyUsageChartProps) {
           width={40}
         />
         <Tooltip
+          cursor={false}
           formatter={(value: number) => [value, 'Số giao dịch']}
           labelFormatter={(label: string) => `Tháng: ${label}`}
         />
