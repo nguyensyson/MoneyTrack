@@ -27,8 +27,9 @@ export function useAuth() {
         const auth = await authApi.login(data);
         saveAuth(auth);
         setUsername(auth.username);
-        setRoles(auth.roles);
-        if (auth.roles.includes('ADMIN')) {
+        const loginRoles = auth.roles ?? [];
+        setRoles(loginRoles);
+        if (loginRoles.includes('ADMIN')) {
           router.push('/admin/dashboard');
         } else {
           router.push('/');
@@ -43,22 +44,23 @@ export function useAuth() {
   );
 
   const register = useCallback(
-    async (data: RegisterRequest) => {
+    async (data: RegisterRequest): Promise<boolean> => {
       setLoading(true);
       setError(null);
       try {
         const auth = await authApi.register(data);
         saveAuth(auth);
         setUsername(auth.username);
-        setRoles(auth.roles);
-        router.push('/');
+        setRoles(auth.roles ?? []);
+        return true;
       } catch (err: any) {
         setError(err.response?.data?.message || 'Đăng ký thất bại');
+        return false;
       } finally {
         setLoading(false);
       }
     },
-    [router]
+    []
   );
 
   const logout = useCallback(() => {
@@ -74,7 +76,7 @@ export function useAuth() {
     loading,
     error,
     isAuthenticated: isAuthenticated(),
-    isAdmin: roles.includes('ADMIN'),
+    isAdmin: (roles ?? []).includes('ADMIN'),
     login,
     register,
     logout,

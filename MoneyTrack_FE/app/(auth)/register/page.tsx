@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +12,8 @@ import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function RegisterPage() {
   const { register, loading, error } = useAuth();
-  const [username, setUsername] = useState('');
+  const router = useRouter();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -29,7 +32,11 @@ export default function RegisterPage() {
       return;
     }
 
-    await register({ username, email, password });
+    const success = await register({ name, email, password });
+    if (success) {
+      toast.success('Đăng ký thành công! Chào mừng bạn đến với Quản lý Tài chính.');
+      setTimeout(() => router.push('/login'), 1500);
+    }
   };
 
   const displayError = localError || error;
@@ -57,13 +64,13 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
-                Tên đăng nhập
+                Họ và tên
               </label>
               <Input
                 type="text"
-                placeholder="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Nguyễn Văn A"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
