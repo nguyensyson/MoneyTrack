@@ -4,6 +4,7 @@ import type {
   TransactionRequest,
   TransactionFilter,
   PageResponse,
+  ExpenseTrendResponse,
 } from '@/lib/types/api';
 
 export const transactionsApi = {
@@ -25,4 +26,9 @@ export const transactionsApi = {
     apiClient
       .get('/api/transactions/export', { params, responseType: 'blob' })
       .then((r) => r.data as Blob),
+
+  getExpenseTrend: () =>
+    apiClient
+      .get<ExpenseTrendResponse>('/api/transactions/expense-trend')
+      .then((r) => r.data),
 };

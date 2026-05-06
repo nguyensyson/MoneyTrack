@@ -105,3 +105,9 @@ export interface ExpenseByCategory {
   totalAmount: number;
   percentage: number;
 }
+
+// Expense Trend
+export interface ExpenseTrendResponse {
+  currentMonth: number[];  // index 0 = ngày 1, length = số ngày trong tháng hiện tại
+  previousMonth: number[]; // index 0 = ngày 1, length = số ngày trong tháng trước
+}

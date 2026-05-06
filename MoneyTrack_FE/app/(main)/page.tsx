@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import { Card } from '@/components/ui/card';
 import { ChartCard } from '@/components/chart-card';
 import { AuthGuard } from '@/components/auth-guard';
+import { ExpenseTrendChart } from '@/components/ExpenseTrendChart';
 import { useFetch } from '@/lib/hooks/useFetch';
 import { statisticsApi } from '@/lib/api/statistics';
 import { ArrowUpRight, ArrowDownLeft, Wallet } from 'lucide-react';
@@ -158,6 +159,11 @@ function DashboardContent() {
               Không có dữ liệu chi tiêu
             </div>
           )}
+        </ChartCard>
+
+        {/* Expense Trend Line Chart */}
+        <ChartCard title="Xu hướng chi tiêu">
+          <ExpenseTrendChart />
         </ChartCard>
       </div>
     </div>

@@ -1,5 +1,6 @@
 package com.money.moneytrack_be.repository;
 
+import com.money.moneytrack_be.dto.response.DailyExpenseProjection;
 import com.money.moneytrack_be.dto.response.MonthlyTransactionCountProjection;
 import com.money.moneytrack_be.entity.Transaction;
 import com.money.moneytrack_be.entity.User;
@@ -105,5 +106,26 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             """)
     List<MonthlyTransactionCountProjection> countActiveTransactionsByMonth(
             @Param("deleteFlag") DeleteFlag deleteFlag
+    );
+
+    // Aggregate daily expense totals for a user within a date range (for expense trend chart)
+    @Query("""
+            SELECT FUNCTION('DAY', t.date) AS dayOfMonth,
+                   COALESCE(SUM(t.amount), 0) AS totalAmount
+            FROM Transaction t
+            WHERE t.user = :user
+              AND t.deleteFlag = :deleteFlag
+              AND t.type = :type
+              AND t.date >= :startDate
+              AND t.date <= :endDate
+            GROUP BY FUNCTION('DAY', t.date)
+            ORDER BY dayOfMonth ASC
+            """)
+    List<DailyExpenseProjection> findDailyExpenseTotals(
+            @Param("user") User user,
+            @Param("deleteFlag") DeleteFlag deleteFlag,
+            @Param("type") TransactionType type,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
     );
 }

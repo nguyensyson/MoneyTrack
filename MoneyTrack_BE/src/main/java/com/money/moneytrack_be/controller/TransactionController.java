@@ -1,8 +1,10 @@
 package com.money.moneytrack_be.controller;
 
 import com.money.moneytrack_be.dto.request.TransactionRequest;
+import com.money.moneytrack_be.dto.response.ExpenseTrendResponse;
 import com.money.moneytrack_be.dto.response.TransactionResponse;
 import com.money.moneytrack_be.entity.Transaction;
+import com.money.moneytrack_be.service.ExpenseTrendService;
 import com.money.moneytrack_be.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import java.util.List;
 public class TransactionController {
 
     private final TransactionService transactionService;
+    private final ExpenseTrendService expenseTrendService;
 
     @PostMapping
     public ResponseEntity<TransactionResponse> create(
@@ -94,5 +97,13 @@ public class TransactionController {
                 ContentDisposition.attachment().filename(filename).build());
 
         return ResponseEntity.ok().headers(headers).body(csvBytes);
+    }
+
+    @GetMapping("/expense-trend")
+    public ResponseEntity<ExpenseTrendResponse> getExpenseTrend(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(
+            expenseTrendService.getExpenseTrend(userDetails.getUsername())
+        );
     }
 }
