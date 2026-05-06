@@ -12,4 +12,7 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findByDeleteFlag(DeleteFlag deleteFlag);
 
     List<Category> findByTypeAndDeleteFlag(CategoryType type, DeleteFlag deleteFlag);
+
+    // Count categories by deleteFlag (for admin overview statistics)
+    long countByDeleteFlag(DeleteFlag deleteFlag);
 }

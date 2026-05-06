@@ -2,26 +2,40 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { getCategories, getTransactionsByMonth, getAllUsers } from '@/lib/mock-data';
 import { Users, List, FolderOpen } from 'lucide-react';
 import { statisticsApi } from '@/lib/api/statistics';
-import type { MonthlyTransactionCount } from '@/lib/types/api';
+import type { MonthlyTransactionCount, AdminDashboardOverview } from '@/lib/types/api';
 import MonthlyUsageChart from './MonthlyUsageChart';
 
 export default function AdminDashboard() {
-  const categories = getCategories();
-  const currentDate = new Date(2026, 2); // March 2026
-  const transactions = getTransactionsByMonth(currentDate.getFullYear(), currentDate.getMonth());
-  const users = getAllUsers();
-
-  const totalUsers = users.length;
-  const totalTransactions = transactions.length;
-  const totalCategories = categories.filter((c) => !c.parentId).length; // Count only parent categories
+  // State for overview statistics
+  const [overview, setOverview] = useState<AdminDashboardOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
 
   // State for monthly transactions chart
   const [chartData, setChartData] = useState<MonthlyTransactionCount[]>([]);
   const [chartLoading, setChartLoading] = useState(true);
   const [chartError, setChartError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setOverviewLoading(true);
+    statisticsApi
+      .getOverview()
+      .then((data) => {
+        if (!cancelled) setOverview(data);
+      })
+      .catch(() => {
+        if (!cancelled) setOverviewError('Không thể tải dữ liệu thống kê');
+      })
+      .finally(() => {
+        if (!cancelled) setOverviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +66,25 @@ export default function AdminDashboard() {
     };
   }, []);
 
+  // Helper to render stat card value based on loading/error/data state
+  const renderStatValue = (value: number | undefined) => {
+    if (overviewLoading) {
+      return (
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      );
+    }
+    if (overviewError) {
+      return (
+        <p className="text-sm text-red-500 dark:text-red-400">{overviewError}</p>
+      );
+    }
+    return (
+      <p className="text-3xl font-bold text-slate-900 dark:text-white">
+        {value ?? 0}
+      </p>
+    );
+  };
+
   return (
     <div>
       {/* Header */}
@@ -74,9 +107,7 @@ export default function AdminDashboard() {
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
                   Tổng số người dùng
                 </p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {totalUsers}
-                </p>
+                {renderStatValue(overview?.totalUsers)}
               </div>
               <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-lg">
                 <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -93,9 +124,7 @@ export default function AdminDashboard() {
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
                   Tổng số giao dịch
                 </p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {totalTransactions}
-                </p>
+                {renderStatValue(overview?.totalTransactions)}
               </div>
               <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-lg">
                 <List className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -112,9 +141,7 @@ export default function AdminDashboard() {
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
                   Tổng số danh mục
                 </p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {totalCategories}
-                </p>
+                {renderStatValue(overview?.totalCategories)}
               </div>
               <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-lg">
                 <FolderOpen className="w-6 h-6 text-purple-600 dark:text-purple-400" />

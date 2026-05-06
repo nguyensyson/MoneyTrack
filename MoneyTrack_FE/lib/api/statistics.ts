@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { SummaryStats, ExpenseByCategory, MonthlyTransactionCount } from '@/lib/types/api';
+import type { SummaryStats, ExpenseByCategory, MonthlyTransactionCount, AdminDashboardOverview } from '@/lib/types/api';
 
 export const statisticsApi = {
   getSummary: (params?: { month?: number; year?: number }) =>
@@ -13,5 +13,10 @@ export const statisticsApi = {
   getMonthlyTransactions: () =>
     apiClient
       .get<MonthlyTransactionCount[]>('/api/admin/statistics/monthly-transactions')
+      .then((r) => r.data),
+
+  getOverview: () =>
+    apiClient
+      .get<AdminDashboardOverview>('/api/admin/statistics/overview')
       .then((r) => r.data),
 };

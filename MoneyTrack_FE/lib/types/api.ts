@@ -79,6 +79,12 @@ export interface UpdateProfileRequest {
 }
 
 // Admin Statistics
+export interface AdminDashboardOverview {
+  totalUsers: number;
+  totalTransactions: number;
+  totalCategories: number;
+}
+
 export interface MonthlyTransactionCount {
   month: string; // "yyyy-MM", e.g. "2026-01"
   count: number;

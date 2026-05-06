@@ -1,5 +1,6 @@
 package com.money.moneytrack_be.service;
 
+import com.money.moneytrack_be.dto.response.AdminDashboardOverviewResponse;
 import com.money.moneytrack_be.dto.response.MonthlyTransactionCountResponse;
 
 import java.util.List;
@@ -7,4 +8,6 @@ import java.util.List;
 public interface AdminStatisticsService {
 
     List<MonthlyTransactionCountResponse> getMonthlyTransactionCounts();
+
+    AdminDashboardOverviewResponse getOverviewStatistics();
 }

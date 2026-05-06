@@ -1,5 +1,6 @@
 package com.money.moneytrack_be.controller;
 
+import com.money.moneytrack_be.dto.response.AdminDashboardOverviewResponse;
 import com.money.moneytrack_be.dto.response.MonthlyTransactionCountResponse;
 import com.money.moneytrack_be.service.AdminStatisticsService;
 import lombok.RequiredArgsConstructor;
@@ -22,5 +23,11 @@ public class AdminStatisticsController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<MonthlyTransactionCountResponse>> getMonthlyTransactions() {
         return ResponseEntity.ok(adminStatisticsService.getMonthlyTransactionCounts());
+    }
+
+    @GetMapping("/overview")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminDashboardOverviewResponse> getOverview() {
+        return ResponseEntity.ok(adminStatisticsService.getOverviewStatistics());
     }
 }

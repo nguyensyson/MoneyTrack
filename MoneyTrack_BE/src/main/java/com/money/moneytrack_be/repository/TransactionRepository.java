@@ -91,6 +91,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("endDate") LocalDate endDate
     );
 
+    // Count transactions by deleteFlag (for admin overview statistics)
+    long countByDeleteFlag(DeleteFlag deleteFlag);
+
     // Count active transactions grouped by month (for admin monthly usage chart)
     @Query("""
             SELECT FUNCTION('DATE_FORMAT', t.date, '%Y-%m') AS yearMonth,
