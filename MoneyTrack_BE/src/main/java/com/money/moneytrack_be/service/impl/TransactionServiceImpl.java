@@ -69,12 +69,12 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
-    public Page<Transaction> getTransactions(String userEmail, String month,
+    public Page<Transaction> getTransactions(String userEmail, Integer month, Integer year,
                                              Long categoryId, Pageable pageable) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userEmail));
 
-        YearMonth yearMonth = resolveMonth(month);
+        YearMonth yearMonth = resolveYearMonth(month, year);
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
@@ -202,16 +202,10 @@ public class TransactionServiceImpl implements TransactionService {
         return transaction;
     }
 
-    private YearMonth resolveMonth(String month) {
+    private YearMonth resolveYearMonth(Integer month, Integer year) {
         YearMonth now = YearMonth.now();
-        if ("previous".equalsIgnoreCase(month)) {
-            return now.minusMonths(1);
-        }
-
-        if (month != null && month.matches("0?[1-9]|1[0-2]")) {
-            return YearMonth.of(now.getYear(), Integer.parseInt(month));
-        }
-
-        return now;
+        int resolvedYear  = (year  != null) ? year  : now.getYear();
+        int resolvedMonth = (month != null) ? month : now.getMonthValue();
+        return YearMonth.of(resolvedYear, resolvedMonth);
     }
 }

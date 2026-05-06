@@ -14,6 +14,7 @@ import { TransactionModal } from '@/components/transaction-modal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import type { ApiTransaction } from '@/lib/types/api';
+import { getYearOptions } from '@/lib/utils/year';
 
 const PAGE_SIZE = 10;
 
@@ -23,7 +24,7 @@ function TransactionsContent() {
   const now = new Date();
 
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year] = useState(now.getFullYear());
+  const [year, setYear] = useState(now.getFullYear());
   const [categoryId, setCategoryId] = useState<number | undefined>(
     searchParams.get('categoryId') ? Number(searchParams.get('categoryId')) : undefined
   );
@@ -127,6 +128,19 @@ function TransactionsContent() {
               {months.map((m) => (
                 <SelectItem key={m} value={String(m)}>
                   Tháng {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={String(year)} onValueChange={(v) => { setYear(Number(v)); setPage(0); }}>
+            <SelectTrigger className="w-28">
+              <SelectValue placeholder="Năm" />
+            </SelectTrigger>
+            <SelectContent>
+              {getYearOptions(now.getFullYear()).map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
                 </SelectItem>
               ))}
             </SelectContent>

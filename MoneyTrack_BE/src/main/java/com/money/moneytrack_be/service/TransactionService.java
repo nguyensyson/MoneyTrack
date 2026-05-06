@@ -14,7 +14,7 @@ public interface TransactionService {
     Transaction create(String userEmail, BigDecimal amount, TransactionType type,
                        Long categoryId, String description, LocalDate date);
 
-    Page<Transaction> getTransactions(String userEmail, String month,
+    Page<Transaction> getTransactions(String userEmail, Integer month, Integer year,
                                       Long categoryId, Pageable pageable);
 
     Transaction update(String userEmail, Long transactionId, BigDecimal amount,

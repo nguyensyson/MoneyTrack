@@ -44,11 +44,12 @@ public class TransactionController {
     @GetMapping
     public ResponseEntity<Page<TransactionResponse>> getTransactions(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestParam(defaultValue = "current") String month,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Long categoryId,
             @PageableDefault(size = 20, sort = "date") Pageable pageable) {
         Page<TransactionResponse> page = transactionService
-                .getTransactions(userDetails.getUsername(), month, categoryId, pageable)
+                .getTransactions(userDetails.getUsername(), month, year, categoryId, pageable)
                 .map(TransactionResponse::from);
         return ResponseEntity.ok(page);
     }
