@@ -1,45 +1,53 @@
-# Tasks
+# Implementation Plan
 
-## Task List
+## Bugfix Tasks
 
-- [x] 1. Backend — DTO và Projection
-  - [x] 1.1 Tạo interface `DailyExpenseProjection` tại `dto/response/DailyExpenseProjection.java` với hai method `getDayOfMonth(): int` và `getTotalAmount(): BigDecimal`
-  - [x] 1.2 Tạo class `ExpenseTrendResponse` tại `dto/response/ExpenseTrendResponse.java` với hai field `List<BigDecimal> currentMonth` và `List<BigDecimal> previousMonth`, dùng `@Getter @Builder`
+- [ ] 1. Read and understand the current `buildDailyTotals` method
+  - Read `MoneyTrack_BE/src/main/java/com/money/moneytrack_be/service/impl/ExpenseTrendServiceImpl.java`
+  - Locate the `buildDailyTotals` method
+  - Understand the current logic: initialization, projection mapping, and return
+  - Identify where the cumulative sum pass needs to be inserted
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4_
 
-- [x] 2. Backend — Repository Query
-  - [x] 2.1 Thêm method `findDailyExpenseTotals` vào `TransactionRepository` với JPQL aggregation query `GROUP BY FUNCTION('DAY', t.date)`, filter theo `user`, `deleteFlag`, `type`, `startDate`, `endDate`, trả về `List<DailyExpenseProjection>`
+- [ ] 2. Implement cumulative sum logic in `buildDailyTotals`
+  - Add cumulative sum pass after the projection mapping loop
+  - Insert the following code before the `return` statement:
+    ```java
+    // Cumulative sum pass: carry forward running total for days with no transactions
+    for (int i = 1; i < daysInMonth; i++) {
+        totals[i] = totals[i - 1].add(totals[i]);
+    }
+    ```
+  - Verify the loop starts at index 1 (day 2) and iterates through all remaining days
+  - Ensure `BigDecimal.add()` is used for safe arithmetic
+  - _Bug_Condition: isBugCondition(day, dailyAmountMap) where dailyAmountMap does NOT contain key for day_
+  - _Expected_Behavior: For days with no transactions, totals[i] = totals[i-1] (carry forward cumulative total)_
+  - _Preservation: Days with transactions still contribute their daily sum correctly before cumulative accumulation (Requirements 3.1, 3.2, 3.3, 3.4)_
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4_
 
-- [x] 3. Backend — Service
-  - [x] 3.1 Tạo interface `ExpenseTrendService` tại `service/ExpenseTrendService.java` với method `getExpenseTrend(String userEmail): ExpenseTrendResponse`
-  - [x] 3.2 Tạo class `ExpenseTrendServiceImpl` tại `service/impl/ExpenseTrendServiceImpl.java` implement `ExpenseTrendService`:
-    - Xác định `currentYearMonth = YearMonth.now()` và `previousYearMonth = currentYearMonth.minusMonths(1)`
-    - Khởi tạo mảng `BigDecimal[]` kích thước = số ngày trong tháng, điền `BigDecimal.ZERO`
-    - Gọi `findDailyExpenseTotals` cho từng tháng, map projection vào index `dayOfMonth - 1`
-    - Trả về `ExpenseTrendResponse` với cả hai mảng
+- [ ] 3. Update Javadoc for `buildDailyTotals`
+  - Replace the existing Javadoc comment with:
+    ```java
+    /**
+     * Builds a cumulative daily expense array for the given month.
+     * The array length equals the number of days in the month.
+     * Each element at index i contains the running total of all EXPENSE
+     * transactions from day 1 through day i+1 (inclusive).
+     * Days with no transactions carry forward the previous day's cumulative total.
+     *
+     * @param user the user whose expenses to aggregate
+     * @param yearMonth the month to build totals for
+     * @return list of cumulative daily totals, one per day in the month
+     */
+    ```
+  - Ensure the documentation accurately reflects the new cumulative behavior
+  - _Requirements: 2.1, 2.2, 2.4_
 
-- [x] 4. Backend — Controller
-  - [x] 4.1 Inject `ExpenseTrendService` vào `TransactionController` và thêm endpoint `GET /expense-trend` trả về `ResponseEntity<ExpenseTrendResponse>`
-
-- [x] 7. Frontend — Types và API
-  - [x] 7.1 Thêm interface `ExpenseTrendResponse` vào `MoneyTrack_FE/lib/types/api.ts` với `currentMonth: number[]` và `previousMonth: number[]`
-  - [x] 7.2 Thêm method `getExpenseTrend` vào `MoneyTrack_FE/lib/api/transactions.ts` gọi `GET /api/transactions/expense-trend` qua `apiClient`
-
-- [x] 8. Frontend — Component `ExpenseTrendChart`
-  - [x] 8.1 Cài đặt `chart.js` và `react-chartjs-2` vào `MoneyTrack_FE` (nếu chưa có)
-  - [x] 8.2 Tạo file `MoneyTrack_FE/components/ExpenseTrendChart.tsx`:
-    - Dùng `useFetch` để gọi `transactionsApi.getExpenseTrend()`
-    - Loading state: hiển thị spinner `animate-spin`
-    - Error state: hiển thị thông báo lỗi tiếng Việt
-    - Data state: render `<Line>` chart với config:
-      - `tension: 0.4`
-      - Dataset "Tháng này": `borderColor: '#ef4444'`
-      - Dataset "Tháng trước": `borderColor: '#94a3b8'`
-      - X-axis labels: `[1, 2, ..., N]` (N = `currentMonth.length`)
-      - `responsive: true`, `maintainAspectRatio: false`
-      - Tooltip formatter hiển thị số tiền định dạng VND (`toLocaleString('vi-VN')`)
-      - Legend hiển thị hai series
-
-- [x] 9. Frontend — Tích hợp vào trang chủ
-  - [x] 9.1 Import và render `<ExpenseTrendChart />` trong `MoneyTrack_FE/app/(main)/page.tsx`, bọc trong `<ChartCard title="Xu hướng chi tiêu">`, đặt bên dưới section pie chart hiện tại
+- [ ] 4. Checkpoint — Verify implementation
+  - Review the modified `ExpenseTrendServiceImpl.java` file
+  - Confirm the cumulative sum loop is correctly placed
+  - Confirm the Javadoc is updated
+  - Confirm no other methods or files were modified
+  - Ask the user if questions arise or manual testing is needed
 
 

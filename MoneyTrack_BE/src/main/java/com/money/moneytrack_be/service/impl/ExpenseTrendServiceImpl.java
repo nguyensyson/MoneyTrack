@@ -43,36 +43,68 @@ public class ExpenseTrendServiceImpl implements ExpenseTrendService {
     }
 
     /**
-     * Builds an array of daily expense totals for the given month.
+     * Builds a cumulative daily expense array for the given month.
      * The array length equals the number of days in the month.
-     * Days with no EXPENSE transactions are filled with {@link BigDecimal#ZERO}.
+     * Each element at index i contains the running total of all EXPENSE
+     * transactions from day 1 through day i+1 (inclusive).
+     * Days with no transactions carry forward the previous day's cumulative total.
      */
     private List<BigDecimal> buildDailyTotals(User user, YearMonth yearMonth) {
-        int daysInMonth = yearMonth.lengthOfMonth();
-        LocalDate startDate = yearMonth.atDay(1);
-        LocalDate endDate = yearMonth.atEndOfMonth();
+    int daysInMonth = yearMonth.lengthOfMonth();
+    LocalDate startDate = yearMonth.atDay(1);
+    LocalDate endDate = yearMonth.atEndOfMonth();
 
-        // Initialize all days to zero
-        BigDecimal[] totals = new BigDecimal[daysInMonth];
-        Arrays.fill(totals, BigDecimal.ZERO);
+    LocalDate today = LocalDate.now();
+    boolean isCurrentMonth = yearMonth.equals(YearMonth.from(today));
+    int currentDay = today.getDayOfMonth();
 
-        // Fetch aggregated daily totals from the database
-        List<DailyExpenseProjection> projections = transactionRepository.findDailyExpenseTotals(
-                user,
-                DeleteFlag.ACTIVE,
-                TransactionType.EXPENSE,
-                startDate,
-                endDate
-        );
+    // Initialize all days to zero
+    BigDecimal[] totals = new BigDecimal[daysInMonth];
+    Arrays.fill(totals, BigDecimal.ZERO);
 
-        // Map each projection into the correct index (dayOfMonth - 1)
-        for (DailyExpenseProjection projection : projections) {
-            int index = projection.getDayOfMonth() - 1;
-            if (index >= 0 && index < daysInMonth) {
-                totals[index] = projection.getTotalAmount();
-            }
+    // Fetch aggregated daily totals from the database
+    List<DailyExpenseProjection> projections = transactionRepository.findDailyExpenseTotals(
+            user,
+            DeleteFlag.ACTIVE,
+            TransactionType.EXPENSE,
+            startDate,
+            endDate
+    );
+
+    // Map daily raw values
+    BigDecimal[] dailyValues = new BigDecimal[daysInMonth];
+    Arrays.fill(dailyValues, BigDecimal.ZERO);
+
+    for (DailyExpenseProjection projection : projections) {
+        int index = projection.getDayOfMonth() - 1;
+        if (index >= 0 && index < daysInMonth) {
+            dailyValues[index] = projection.getTotalAmount();
         }
-
-        return Arrays.asList(totals);
     }
+
+    // Cumulative logic with future-day rule
+    BigDecimal runningTotal = BigDecimal.ZERO;
+
+    for (int i = 0; i < daysInMonth; i++) {
+        int day = i + 1;
+
+        // Nếu là tháng hiện tại và là ngày tương lai
+        if (isCurrentMonth && day > currentDay) {
+            if (dailyValues[i].compareTo(BigDecimal.ZERO) > 0) {
+                // Có transaction future → vẫn cộng tiếp
+                runningTotal = runningTotal.add(dailyValues[i]);
+                totals[i] = runningTotal;
+            } else {
+                // Không có transaction → trả về 0
+                totals[i] = null;
+            }
+        } else {
+            // Ngày trong quá khứ hoặc tháng trước → cumulative bình thường
+            runningTotal = runningTotal.add(dailyValues[i]);
+            totals[i] = runningTotal;
+        }
+    }
+
+    return Arrays.asList(totals);
+}
 }
