@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CategorySelector, type CategoryWithChildren } from '@/components/category-selector';
 import { transactionsApi } from '@/lib/api/transactions';
 import type { ApiCategory, ApiTransaction, TransactionRequest } from '@/lib/types/api';
 
@@ -48,6 +49,31 @@ export function TransactionModal({ open, transaction, categories, onClose, onSav
   }, [transaction, open]);
 
   const filteredCategories = categories.filter((c) => c.type === type);
+
+  const toSelectorCategories = (apiCats: ApiCategory[]): CategoryWithChildren[] =>
+    apiCats.map((c) => ({
+      id: String(c.id),
+      name: c.name,
+      type: c.type.toLowerCase() as 'income' | 'expense',
+      color: '',
+      parentId: c.parentId ? String(c.parentId) : undefined,
+      children: Array.isArray(c.children)
+        ? c.children.map((child) => ({
+            id: String(child.id),
+            name: child.name,
+            type: (child.type ?? c.type).toLowerCase() as 'income' | 'expense',
+            color: '',
+            parentId: String(child.parentId),
+            children: [],
+          }))
+        : [],
+    }));
+
+  const filteredSelectorCategories = useMemo(
+    () => toSelectorCategories(filteredCategories),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredCategories]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,18 +151,12 @@ export function TransactionModal({ open, transaction, categories, onClose, onSav
           {/* Category */}
           <div>
             <label className="block text-sm font-medium mb-1">Danh mục *</label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Chọn danh mục" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredCategories.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CategorySelector
+              categories={filteredSelectorCategories}
+              value={categoryId}
+              onChange={setCategoryId}
+              placeholder="Chọn danh mục"
+            />
           </div>
 
           {/* Date */}
