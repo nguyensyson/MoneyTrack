@@ -162,7 +162,7 @@ function DashboardContent() {
         </ChartCard>
 
         {/* Expense Trend Line Chart */}
-        <ChartCard title="Xu hướng chi tiêu">
+        <ChartCard title="Xu hướng chi tiêu" className='mt-8'>
           <ExpenseTrendChart />
         </ChartCard>
       </div>
