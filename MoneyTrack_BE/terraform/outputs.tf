@@ -1,21 +1,31 @@
 # =============================================================================
-# OUTPUTS (Req 6.1, 6.2, 6.3)
+# OUTPUTS
 # =============================================================================
 
-# Public API URL — use this to reach the backend after deployment (Req 6.1)
+# Public API URL — use this to reach the backend after deployment
 output "alb_dns_name" {
   description = "Public DNS name of the Application Load Balancer (API entry point)"
   value       = aws_lb.main.dns_name
 }
 
-# ECR repository URL — use this when tagging and pushing the Docker image (Req 6.2)
+# ECR repository URL — use this when tagging and pushing the Docker image
 output "ecr_repository_url" {
   description = "ECR repository URL for pushing the backend Docker image"
   value       = aws_ecr_repository.app.repository_url
 }
 
-# RDS endpoint — useful for debugging or running migrations directly (Req 6.3)
-output "rds_endpoint" {
-  description = "RDS MySQL instance endpoint (host:port)"
-  value       = aws_db_instance.mysql.endpoint
+# DynamoDB table ARNs — useful for IAM policy debugging
+output "dynamodb_users_table_arn" {
+  description = "ARN of the DynamoDB users table"
+  value       = aws_dynamodb_table.users.arn
+}
+
+output "dynamodb_categories_table_arn" {
+  description = "ARN of the DynamoDB categories table"
+  value       = aws_dynamodb_table.categories.arn
+}
+
+output "dynamodb_transactions_table_arn" {
+  description = "ARN of the DynamoDB transactions table"
+  value       = aws_dynamodb_table.transactions.arn
 }

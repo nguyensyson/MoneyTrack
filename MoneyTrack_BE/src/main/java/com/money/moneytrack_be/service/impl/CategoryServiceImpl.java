@@ -2,32 +2,34 @@ package com.money.moneytrack_be.service.impl;
 
 import com.money.moneytrack_be.dto.request.CategoryRequest;
 import com.money.moneytrack_be.dto.response.CategoryResponse;
-import com.money.moneytrack_be.entity.Category;
+import com.money.moneytrack_be.entity.CategoryItem;
 import com.money.moneytrack_be.enums.CategoryType;
-import com.money.moneytrack_be.enums.DeleteFlag;
 import com.money.moneytrack_be.exception.ResourceNotFoundException;
-import com.money.moneytrack_be.repository.CategoryRepository;
+import com.money.moneytrack_be.repository.CategoryDynamoRepository;
 import com.money.moneytrack_be.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
 
-    private final CategoryRepository categoryRepository;
+    private final CategoryDynamoRepository categoryRepository;
 
     @Override
     public List<CategoryResponse> getCategories(CategoryType type) {
-        List<Category> flat = (type != null)
-                ? categoryRepository.findByTypeAndDeleteFlag(type, DeleteFlag.ACTIVE)
-                : categoryRepository.findByDeleteFlag(DeleteFlag.ACTIVE);
+        List<CategoryItem> flat = (type != null)
+                ? categoryRepository.findActiveByType(type.name())
+                : categoryRepository.findAllActive();
 
-        List<Category> parents = flat.stream()
-                .filter(c -> c.getParent() == null)
+        // Build tree: parents first, then attach children
+        List<CategoryItem> parents = flat.stream()
+                .filter(c -> c.getParentId() == null || c.getParentId().isBlank())
                 .collect(Collectors.toList());
 
         return parents.stream()
@@ -37,69 +39,80 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public CategoryResponse createCategory(CategoryRequest request) {
-        Category parent = resolveParent(request.getParentId());
-        Category category = Category.builder()
+        String parentId = resolveParentId(request.getParentId());
+        String now = Instant.now().toString();
+        CategoryItem item = CategoryItem.builder()
+                .categoryId(UUID.randomUUID().toString())
                 .name(request.getName())
-                .type(request.getType())
-                .parent(parent)
-                .deleteFlag(DeleteFlag.ACTIVE)
+                .type(request.getType().name())
+                .parentId(parentId)
+                .deleteFlag(0)
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
-        Category saved = categoryRepository.save(category);
-        return toSingleResponse(saved);
+        return toSingleResponse(categoryRepository.save(item));
     }
 
     @Override
-    public CategoryResponse updateCategory(Long id, CategoryRequest request) {
-        Category category = categoryRepository.findById(id)
-                .filter(c -> c.getDeleteFlag() == DeleteFlag.ACTIVE)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
-        category.setName(request.getName());
-        category.setType(request.getType());
-        category.setParent(resolveParent(request.getParentId()));
-        return toSingleResponse(categoryRepository.save(category));
+    public CategoryResponse updateCategory(String categoryId, CategoryRequest request) {
+        CategoryItem item = getActiveCategory(categoryId);
+        String parentId = resolveParentId(request.getParentId());
+        item.setName(request.getName());
+        item.setType(request.getType().name());
+        item.setParentId(parentId);
+        item.setUpdatedAt(Instant.now().toString());
+        return toSingleResponse(categoryRepository.save(item));
     }
 
     @Override
-    public void deleteCategory(Long id) {
-        Category category = categoryRepository.findById(id)
-                .filter(c -> c.getDeleteFlag() == DeleteFlag.ACTIVE)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
-        category.setDeleteFlag(DeleteFlag.DELETED);
-        categoryRepository.save(category);
+    public void deleteCategory(String categoryId) {
+        CategoryItem item = getActiveCategory(categoryId);
+        item.setDeleteFlag(1);
+        item.setUpdatedAt(Instant.now().toString());
+        categoryRepository.save(item);
     }
 
-    private Category resolveParent(Long parentId) {
-        if (parentId == null) return null;
-        return categoryRepository.findById(parentId)
-                .filter(c -> c.getDeleteFlag() == DeleteFlag.ACTIVE)
-                .orElseThrow(() -> new ResourceNotFoundException("Parent category not found with id: " + parentId));
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private CategoryItem getActiveCategory(String categoryId) {
+        return categoryRepository.findById(categoryId)
+                .filter(c -> c.getDeleteFlag() == 0)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + categoryId));
     }
 
-    private CategoryResponse toSingleResponse(Category category) {
+    private String resolveParentId(String parentId) {
+        if (parentId == null || parentId.isBlank()) return null;
+        categoryRepository.findById(parentId)
+                .filter(c -> c.getDeleteFlag() == 0)
+                .orElseThrow(() -> new ResourceNotFoundException("Parent category not found: " + parentId));
+        return parentId;
+    }
+
+    private CategoryResponse toSingleResponse(CategoryItem item) {
         return CategoryResponse.builder()
-                .id(category.getId())
-                .name(category.getName())
-                .type(category.getType())
+                .id(item.getCategoryId())
+                .name(item.getName())
+                .type(CategoryType.valueOf(item.getType()))
                 .children(List.of())
                 .build();
     }
 
-    private CategoryResponse toResponse(Category parent, List<Category> all) {
+    private CategoryResponse toResponse(CategoryItem parent, List<CategoryItem> all) {
         List<CategoryResponse> children = all.stream()
-                .filter(c -> c.getParent() != null && c.getParent().getId().equals(parent.getId()))
+                .filter(c -> parent.getCategoryId().equals(c.getParentId()))
                 .map(child -> CategoryResponse.builder()
-                        .id(child.getId())
+                        .id(child.getCategoryId())
                         .name(child.getName())
-                        .type(child.getType())
-                        .parentId(child.getParent().getId())
+                        .type(CategoryType.valueOf(child.getType()))
+                        .parentId(child.getParentId())
                         .children(List.of())
                         .build())
                 .collect(Collectors.toList());
 
         return CategoryResponse.builder()
-                .id(parent.getId())
+                .id(parent.getCategoryId())
                 .name(parent.getName())
-                .type(parent.getType())
+                .type(CategoryType.valueOf(parent.getType()))
                 .children(children)
                 .build();
     }

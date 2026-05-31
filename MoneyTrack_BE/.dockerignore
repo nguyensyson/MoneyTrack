@@ -1,0 +1,42 @@
+# ─── Build output ─────────────────────────────────────────────────────────────
+target/
+
+# ─── IDE / editor ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# ─── Git ──────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+
+# ─── Maven wrapper (not needed inside image — we use the mvn binary) ──────────
+# Keep .mvn/ if you rely on maven-wrapper.properties for version pinning.
+# Uncomment the line below only if you do NOT use mvnw inside the image.
+# .mvn/
+
+# ─── Kiro / spec files ────────────────────────────────────────────────────────
+.kiro/
+
+# ─── Environment / secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Docker files themselves (no need to copy into image) ─────────────────────
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# ─── Docs / misc ──────────────────────────────────────────────────────────────
+*.md
+DEPLOYMENT.md
+HELP.md
+README.md
+
+# ─── OS artifacts ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

@@ -1,12 +1,15 @@
 package com.money.moneytrack_be.repository;
 
-import com.money.moneytrack_be.entity.Role;
-import com.money.moneytrack_be.enums.RoleName;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.Optional;
-
-public interface RoleRepository extends JpaRepository<Role, Long> {
-
-    Optional<Role> findByName(RoleName name);
+/**
+ * LEGACY — NOT USED IN RUNTIME.
+ *
+ * This Spring Data JPA repository was used when the backend connected to MySQL.
+ * Roles are now stored as a Set<String> directly inside UserItem in DynamoDB.
+ * There is no separate roles table in DynamoDB.
+ *
+ * This file is retained for historical reference only and can be safely deleted.
+ */
+@Deprecated(since = "DynamoDB migration", forRemoval = true)
+public interface RoleRepository {
+    // intentionally empty — see Javadoc above
 }

@@ -12,34 +12,27 @@ variable "app_name" {
   default     = "moneytrack"
 }
 
-# --- Database variables ---
+# ─── DynamoDB table names ─────────────────────────────────────────────────────
 
-variable "db_name" {
-  description = "Name of the MySQL database to create in RDS"
+variable "dynamodb_table_users" {
+  description = "Name of the DynamoDB users table"
   type        = string
-  default     = "moneytrack"
+  default     = "moneytrack-users"
 }
 
-variable "db_username" {
-  description = "Master username for the RDS MySQL instance"
+variable "dynamodb_table_categories" {
+  description = "Name of the DynamoDB categories table"
   type        = string
-  default     = "admin"
+  default     = "moneytrack-categories"
 }
 
-# Sensitive: will not be shown in plan/apply output or state logs
-variable "db_password" {
-  description = "Master password for the RDS MySQL instance"
+variable "dynamodb_table_transactions" {
+  description = "Name of the DynamoDB transactions table"
   type        = string
-  sensitive   = true
+  default     = "moneytrack-transactions"
 }
 
-variable "db_instance_class" {
-  description = "RDS instance class (e.g. db.t3.micro for dev, db.t3.small for staging)"
-  type        = string
-  default     = "db.t3.micro"
-}
-
-# --- Application secrets ---
+# ─── Application secrets ──────────────────────────────────────────────────────
 
 # Sensitive: will not be shown in plan/apply output or state logs
 variable "jwt_secret" {
@@ -48,7 +41,7 @@ variable "jwt_secret" {
   sensitive   = true
 }
 
-# --- ECS task sizing ---
+# ─── ECS task sizing ──────────────────────────────────────────────────────────
 
 variable "ecs_cpu" {
   description = "CPU units for the ECS Fargate task (256, 512, 1024, 2048, 4096)"

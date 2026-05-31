@@ -1,0 +1,46 @@
+# ─── Next.js build output ─────────────────────────────────────────────────────
+.next/
+out/
+
+# ─── Dependencies (reinstalled inside image) ──────────────────────────────────
+node_modules/
+
+# ─── IDE / editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+
+# ─── Git ──────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ─── Kiro / spec files ────────────────────────────────────────────────────────
+.kiro/
+
+# ─── Environment / secrets ────────────────────────────────────────────────────
+.env
+.env.*
+.env*.local
+
+# ─── Docker files themselves ──────────────────────────────────────────────────
+Dockerfile
+.dockerignore
+
+# ─── Test / coverage ──────────────────────────────────────────────────────────
+coverage/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+vitest.config.ts
+
+# ─── Docs / misc ──────────────────────────────────────────────────────────────
+README.md
+*.md
+
+# ─── OS artifacts ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── TypeScript incremental build info ────────────────────────────────────────
+tsconfig.tsbuildinfo

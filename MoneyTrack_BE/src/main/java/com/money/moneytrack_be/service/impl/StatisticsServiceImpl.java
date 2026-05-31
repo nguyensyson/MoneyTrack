@@ -2,21 +2,18 @@ package com.money.moneytrack_be.service.impl;
 
 import com.money.moneytrack_be.dto.response.ExpenseByCategoryResponse;
 import com.money.moneytrack_be.dto.response.SummaryResponse;
-import com.money.moneytrack_be.entity.Category;
-import com.money.moneytrack_be.entity.Transaction;
-import com.money.moneytrack_be.entity.User;
-import com.money.moneytrack_be.enums.DeleteFlag;
+import com.money.moneytrack_be.entity.TransactionItem;
+import com.money.moneytrack_be.entity.UserItem;
 import com.money.moneytrack_be.enums.TransactionType;
 import com.money.moneytrack_be.exception.ResourceNotFoundException;
-import com.money.moneytrack_be.repository.TransactionRepository;
-import com.money.moneytrack_be.repository.UserRepository;
+import com.money.moneytrack_be.repository.TransactionDynamoRepository;
+import com.money.moneytrack_be.repository.UserDynamoRepository;
 import com.money.moneytrack_be.service.StatisticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -27,21 +24,24 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StatisticsServiceImpl implements StatisticsService {
 
-    private final TransactionRepository transactionRepository;
-    private final UserRepository userRepository;
+    private final TransactionDynamoRepository transactionRepository;
+    private final UserDynamoRepository userRepository;
 
     @Override
     public SummaryResponse getSummary(String userEmail, String month) {
-        User user = getUser(userEmail);
-        LocalDate[] range = resolveRange(month);
+        UserItem user = getUser(userEmail);
+        YearMonth ym = resolveYearMonth(month);
+        String startDate = ym.atDay(1).toString();
+        String endDate   = ym.atEndOfMonth().toString();
 
-        BigDecimal totalIncome = transactionRepository.sumByUserAndTypeAndDeleteFlagAndDateRange(
-                user, TransactionType.INCOME, DeleteFlag.ACTIVE, range[0], range[1]);
-        BigDecimal totalExpense = transactionRepository.sumByUserAndTypeAndDeleteFlagAndDateRange(
-                user, TransactionType.EXPENSE, DeleteFlag.ACTIVE, range[0], range[1]);
+        List<TransactionItem> transactions = transactionRepository
+                .findByUserIdAndDateRange(user.getUserId(), startDate, endDate)
+                .stream()
+                .filter(t -> t.getDeleteFlag() == 0)
+                .toList();
 
-        totalIncome = totalIncome != null ? totalIncome : BigDecimal.ZERO;
-        totalExpense = totalExpense != null ? totalExpense : BigDecimal.ZERO;
+        BigDecimal totalIncome = sumByType(transactions, TransactionType.INCOME);
+        BigDecimal totalExpense = sumByType(transactions, TransactionType.EXPENSE);
 
         return SummaryResponse.builder()
                 .totalIncome(totalIncome)
@@ -52,33 +52,40 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Override
     public List<ExpenseByCategoryResponse> getExpenseByCategory(String userEmail, String month) {
-        User user = getUser(userEmail);
-        LocalDate[] range = resolveRange(month);
+        UserItem user = getUser(userEmail);
+        YearMonth ym = resolveYearMonth(month);
+        String startDate = ym.atDay(1).toString();
+        String endDate   = ym.atEndOfMonth().toString();
 
-        List<Transaction> transactions = transactionRepository.findByUserAndTypeAndDeleteFlagAndDateRange(
-                user, TransactionType.EXPENSE, DeleteFlag.ACTIVE, range[0], range[1]);
+        List<TransactionItem> expenses = transactionRepository
+                .findByUserIdAndDateRange(user.getUserId(), startDate, endDate)
+                .stream()
+                .filter(t -> t.getDeleteFlag() == 0)
+                .filter(t -> TransactionType.EXPENSE.name().equals(t.getType()))
+                .toList();
 
-        if (transactions.isEmpty()) {
+        if (expenses.isEmpty()) {
             return List.of();
         }
 
-        Map<Category, BigDecimal> totals = new LinkedHashMap<>();
-        for (Transaction t : transactions) {
-            Category parent = t.getCategory().getParent() != null
-                    ? t.getCategory().getParent()
-                    : t.getCategory();
-            totals.merge(parent, t.getAmount(), BigDecimal::add);
+        // Group by parent category name (fall back to category name if no parent)
+        Map<String, BigDecimal> totals = new LinkedHashMap<>();
+        for (TransactionItem t : expenses) {
+            String groupKey = (t.getParentCategoryName() != null && !t.getParentCategoryName().isBlank())
+                    ? t.getParentCategoryName()
+                    : t.getCategoryName();
+            totals.merge(groupKey, new BigDecimal(t.getAmount()), BigDecimal::add);
         }
 
         BigDecimal grandTotal = totals.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<ExpenseByCategoryResponse> result = new ArrayList<>();
-        for (Map.Entry<Category, BigDecimal> entry : totals.entrySet()) {
+        for (Map.Entry<String, BigDecimal> entry : totals.entrySet()) {
             BigDecimal percentage = entry.getValue()
                     .multiply(new BigDecimal("100"))
                     .divide(grandTotal, 2, RoundingMode.HALF_UP);
             result.add(ExpenseByCategoryResponse.builder()
-                    .categoryName(entry.getKey().getName())
+                    .categoryName(entry.getKey())
                     .totalAmount(entry.getValue())
                     .percentage(percentage)
                     .build());
@@ -86,15 +93,23 @@ public class StatisticsServiceImpl implements StatisticsService {
         return result;
     }
 
-    private User getUser(String email) {
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private UserItem getUser(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
     }
 
-    private LocalDate[] resolveRange(String month) {
-        YearMonth ym = "previous".equalsIgnoreCase(month)
+    private YearMonth resolveYearMonth(String month) {
+        return "previous".equalsIgnoreCase(month)
                 ? YearMonth.now().minusMonths(1)
                 : YearMonth.now();
-        return new LocalDate[]{ym.atDay(1), ym.atEndOfMonth()};
+    }
+
+    private BigDecimal sumByType(List<TransactionItem> transactions, TransactionType type) {
+        return transactions.stream()
+                .filter(t -> type.name().equals(t.getType()))
+                .map(t -> new BigDecimal(t.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

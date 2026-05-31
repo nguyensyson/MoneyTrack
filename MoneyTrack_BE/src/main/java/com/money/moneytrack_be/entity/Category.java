@@ -1,36 +1,17 @@
 package com.money.moneytrack_be.entity;
 
-import com.money.moneytrack_be.enums.CategoryType;
-import com.money.moneytrack_be.enums.DeleteFlag;
-import jakarta.persistence.*;
-import lombok.*;
-
-@Entity
-@Table(name = "categories")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Category extends BaseEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false)
-    private String name;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CategoryType type;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_id")
-    private Category parent;
-
-    @Enumerated(EnumType.ORDINAL)
-    @Column(name = "delete_flag", nullable = false)
-    @Builder.Default
-    private DeleteFlag deleteFlag = DeleteFlag.ACTIVE;
+/**
+ * LEGACY — NOT USED IN RUNTIME.
+ *
+ * This JPA entity was used when the backend connected to MySQL.
+ * The application has been migrated to Amazon DynamoDB.
+ * The active category model is {@link CategoryItem}.
+ *
+ * This file is retained for historical reference only.
+ * It can be safely deleted once the team confirms no rollback to MySQL is needed.
+ * Do NOT add this class back to any Spring component or repository.
+ */
+@Deprecated(since = "DynamoDB migration", forRemoval = true)
+public class Category {
+    // intentionally empty — see Javadoc above
 }

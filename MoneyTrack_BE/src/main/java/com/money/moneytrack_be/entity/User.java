@@ -1,38 +1,17 @@
 package com.money.moneytrack_be.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-
-import java.util.HashSet;
-import java.util.Set;
-
-@Entity
-@Table(name = "users")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class User extends BaseEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, unique = true)
-    private String email;
-
-    @Column(nullable = false)
-    private String password;
-
-    @Column(nullable = false)
-    private String name;
-
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(
-        name = "user_roles",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
-    private Set<Role> roles = new HashSet<>();
+/**
+ * LEGACY — NOT USED IN RUNTIME.
+ *
+ * This JPA entity was used when the backend connected to MySQL.
+ * The application has been migrated to Amazon DynamoDB.
+ * The active user model is {@link UserItem}.
+ *
+ * This file is retained for historical reference only.
+ * It can be safely deleted once the team confirms no rollback to MySQL is needed.
+ * Do NOT add this class back to any Spring component or repository.
+ */
+@Deprecated(since = "DynamoDB migration", forRemoval = true)
+public class User {
+    // intentionally empty — see Javadoc above
 }

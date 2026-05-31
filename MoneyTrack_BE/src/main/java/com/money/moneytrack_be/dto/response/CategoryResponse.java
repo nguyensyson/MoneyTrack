@@ -9,9 +9,9 @@ import java.util.List;
 @Getter
 @Builder
 public class CategoryResponse {
-    private Long id;
+    private String id;
     private String name;
     private CategoryType type;
     private List<CategoryResponse> children;
-    private Long parentId;
+    private String parentId;
 }

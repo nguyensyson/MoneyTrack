@@ -1,0 +1,62 @@
+# =============================================================================
+# terraform.tfvars.example
+# Copy this file to terraform.tfvars and fill in the values.
+# NEVER commit terraform.tfvars to version control — it contains secrets.
+# =============================================================================
+
+# ─── General ──────────────────────────────────────────────────────────────────
+project_name = "moneytrack"
+environment  = "prod"
+
+# ─── Regions ──────────────────────────────────────────────────────────────────
+primary_region   = "ap-southeast-1"   # Singapore
+secondary_region = "ap-northeast-1"   # Tokyo (DynamoDB Global Tables replica)
+
+# ─── Networking ───────────────────────────────────────────────────────────────
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
+
+# ─── Domain ───────────────────────────────────────────────────────────────────
+domain_name         = "moneytrack.com"
+frontend_subdomain  = "www"
+api_subdomain       = "api"
+create_route53_zone = false   # Set to true if you want Terraform to create the hosted zone
+
+# ─── ECR / Docker ─────────────────────────────────────────────────────────────
+ecr_image_tag_mutability = "MUTABLE"
+backend_image_tag        = "latest"
+
+# ─── ECS / Fargate ────────────────────────────────────────────────────────────
+ecs_cpu           = 512    # 0.5 vCPU
+ecs_memory        = 1024   # 1 GB
+ecs_desired_count = 2      # 2 tasks across 2 AZs
+ecs_min_capacity  = 1
+ecs_max_capacity  = 4
+container_port    = 8080
+
+# ─── DynamoDB ─────────────────────────────────────────────────────────────────
+dynamodb_table_users        = "moneytrack-users"
+dynamodb_table_categories   = "moneytrack-categories"
+dynamodb_table_transactions = "moneytrack-transactions"
+dynamodb_enable_global_tables    = true
+dynamodb_point_in_time_recovery  = true
+
+# ─── Secrets (SENSITIVE — do not commit) ──────────────────────────────────────
+jwt_secret   = "REPLACE_WITH_STRONG_RANDOM_SECRET_MIN_32_CHARS"
+
+# ─── GitHub ───────────────────────────────────────────────────────────────────
+github_org                  = "your-github-org"
+github_repo                 = "MoneyTrack"
+github_token                = "ghp_REPLACE_WITH_YOUR_GITHUB_TOKEN"
+create_github_oidc_provider = true   # Set to false if OIDC provider already exists
+amplify_branch              = "main"
+
+# ─── WAF ──────────────────────────────────────────────────────────────────────
+waf_rate_limit = 2000   # Max requests per 5 minutes per IP
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+log_retention_days = 30
+
+# ─── Alerting ─────────────────────────────────────────────────────────────────
+alert_email = "your-team@example.com"   # Leave empty "" to skip email alerts

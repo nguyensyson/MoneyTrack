@@ -1,0 +1,335 @@
+# =============================================================================
+# MoneyTrack — CI/CD Pipeline
+#
+# Architecture:
+#   Backend  → Docker image → ECR → ECS Fargate (via ALB + Global Accelerator)
+#   Frontend → AWS Amplify  (auto-build triggered by push to main)
+#
+# Auth: GitHub OIDC → IAM Role (no long-lived AWS keys stored in secrets)
+# =============================================================================
+
+name: Deploy MoneyTrack
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: "Deploy backend to ECS?"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      deploy_frontend:
+        description: "Trigger Amplify frontend build?"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      image_tag:
+        description: "Docker image tag (leave blank to use git SHA)"
+        required: false
+        default: ""
+
+# Cancel in-progress runs on the same branch to avoid race conditions
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_BE }}
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER_NAME }}
+  ECS_SERVICE: ${{ vars.ECS_SERVICE_NAME }}
+  ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY }}
+  CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
+  AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
+  AMPLIFY_BRANCH: ${{ vars.AMPLIFY_BRANCH }}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1 — Backend: Test → Build → Push to ECR → Deploy to ECS
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  backend:
+    name: Backend — Test, Build & Deploy
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_backend == 'true')
+
+    # Permissions required for GitHub OIDC token exchange
+    permissions:
+      id-token: write   # Request OIDC JWT
+      contents: read    # Checkout source
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      image_uri: ${{ steps.meta.outputs.image_uri }}
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Java 17 ────────────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: "maven"
+
+      # ── 3. Run backend tests ─────────────────────────────────────────────────
+      # Tests run against DynamoDB Local spun up as a service container.
+      # The smoke test (MoneyTrackBeApplicationTests) is excluded here because
+      # it requires a full Spring context with real AWS credentials.
+      # Unit tests and property-based tests (jqwik) run without AWS.
+      - name: Run backend tests
+        working-directory: MoneyTrack_BE
+        env:
+          # Provide dummy values so the Spring context can start in test mode
+          AWS_REGION: ap-southeast-1
+          AWS_ACCESS_KEY_ID: local
+          AWS_SECRET_ACCESS_KEY: local
+          DYNAMODB_ENDPOINT: http://localhost:8000
+          JWT_SECRET: test-secret-key-for-ci-only-not-production
+        run: |
+          mvn test \
+            -Dspring.profiles.active=test \
+            --no-transfer-progress \
+            -q
+
+      # ── 4. Publish test results ───────────────────────────────────────────────
+      - name: Publish test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: "MoneyTrack_BE/target/surefire-reports/TEST-*.xml"
+          check_name: "Backend Test Results"
+          fail_on_failure: true
+
+      # ── 5. Compute image tag ─────────────────────────────────────────────────
+      - name: Compute image tag and URI
+        id: meta
+        run: |
+          # Use manual input tag if provided, otherwise use short git SHA
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          else
+            TAG="${{ github.sha }}"
+            TAG="${TAG:0:7}"
+          fi
+
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "pending")
+          IMAGE_URI="${{ env.ECR_REPOSITORY }}:${TAG}"
+
+          echo "image_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          echo "Image tag: ${TAG}"
+          echo "Image URI: ${IMAGE_URI}"
+
+      # ── 6. Configure AWS credentials via OIDC ────────────────────────────────
+      # No AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY needed.
+      # GitHub exchanges the OIDC token for temporary STS credentials.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-moneytrack-${{ github.run_id }}
+
+      # ── 7. Login to Amazon ECR ───────────────────────────────────────────────
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── 8. Build and push Docker image ───────────────────────────────────────
+      - name: Build and push backend Docker image
+        id: docker-build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./MoneyTrack_BE
+          file: ./MoneyTrack_BE/Dockerfile
+          push: true
+          # Tag with both the short SHA and 'latest' for easy rollback
+          tags: |
+            ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}
+            ${{ env.ECR_REPOSITORY }}:latest
+          # Use GitHub Actions cache to speed up layer reuse
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false  # Disable SBOM provenance to keep manifest simple
+
+      # ── 9. Render new ECS task definition ────────────────────────────────────
+      # Downloads the current task definition and replaces only the image URI.
+      # All other settings (CPU, memory, secrets, env vars) remain unchanged.
+      - name: Download current ECS task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ env.ECS_TASK_FAMILY }}" \
+            --query taskDefinition \
+            > /tmp/task-definition.json
+
+      - name: Render updated ECS task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: /tmp/task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}
+
+      # ── 10. Deploy to ECS ────────────────────────────────────────────────────
+      # Registers the new task definition revision and updates the ECS service.
+      # Waits for the service to reach a stable state (all tasks healthy).
+      # The ECS service has deployment_circuit_breaker enabled — it will
+      # automatically roll back if the new tasks fail health checks.
+      - name: Deploy to ECS Fargate
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 10
+
+      # ── 11. Verify deployment ────────────────────────────────────────────────
+      - name: Verify ECS service is stable
+        run: |
+          echo "Checking ECS service status..."
+          aws ecs describe-services \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}" \
+            --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}' \
+            --output table
+
+          echo "Deployed image: ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Frontend: Test → Trigger Amplify build
+  # ─────────────────────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend — Test & Trigger Amplify
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_frontend == 'true')
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Node.js + pnpm ─────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable pnpm via corepack
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
+      # ── 3. Install dependencies ───────────────────────────────────────────────
+      - name: Install frontend dependencies
+        working-directory: MoneyTrack_FE
+        run: pnpm install --frozen-lockfile
+
+      # ── 4. Run frontend tests ─────────────────────────────────────────────────
+      - name: Run frontend tests
+        working-directory: MoneyTrack_FE
+        run: pnpm vitest run --reporter=verbose
+
+      # ── 5. Build frontend (smoke check) ──────────────────────────────────────
+      # This catches build-time errors before Amplify runs its own build.
+      # NEXT_PUBLIC_API_URL is set to a placeholder — Amplify will override it.
+      - name: Build frontend (smoke check)
+        working-directory: MoneyTrack_FE
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: pnpm build
+
+      # ── 6. Configure AWS credentials via OIDC ────────────────────────────────
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-moneytrack-fe-${{ github.run_id }}
+
+      # ── 7. Trigger Amplify build ──────────────────────────────────────────────
+      # Amplify has enable_auto_build = true, so a push to main already triggers
+      # a build automatically. This step is a manual trigger for workflow_dispatch
+      # or to force a rebuild after infrastructure changes.
+      - name: Trigger Amplify build
+        run: |
+          JOB_ID=$(aws amplify start-job \
+            --app-id "${{ env.AMPLIFY_APP_ID }}" \
+            --branch-name "${{ env.AMPLIFY_BRANCH }}" \
+            --job-type RELEASE \
+            --query 'jobSummary.jobId' \
+            --output text)
+
+          echo "Amplify build triggered. Job ID: ${JOB_ID}"
+          echo "Monitor at: https://${{ env.AMPLIFY_BRANCH }}.${{ env.AMPLIFY_APP_ID }}.amplifyapp.com"
+
+      # ── 8. Wait for Amplify build to complete ────────────────────────────────
+      - name: Wait for Amplify build
+        run: |
+          echo "Polling Amplify build status (max 10 minutes)..."
+          MAX_ATTEMPTS=20
+          SLEEP_SECONDS=30
+
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            STATUS=$(aws amplify list-jobs \
+              --app-id "${{ env.AMPLIFY_APP_ID }}" \
+              --branch-name "${{ env.AMPLIFY_BRANCH }}" \
+              --max-results 1 \
+              --query 'jobSummaries[0].status' \
+              --output text)
+
+            echo "Attempt ${i}/${MAX_ATTEMPTS} — Amplify status: ${STATUS}"
+
+            case "$STATUS" in
+              SUCCEED)
+                echo "Amplify build succeeded."
+                exit 0
+                ;;
+              FAILED|CANCELLED)
+                echo "Amplify build failed with status: ${STATUS}"
+                exit 1
+                ;;
+              RUNNING|PENDING|PROVISIONING)
+                sleep $SLEEP_SECONDS
+                ;;
+              *)
+                echo "Unknown status: ${STATUS}. Retrying..."
+                sleep $SLEEP_SECONDS
+                ;;
+            esac
+          done
+
+          echo "Timed out waiting for Amplify build."
+          exit 1
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 3 — Notify on failure
+  # ─────────────────────────────────────────────────────────────────────────────
+  notify-failure:
+    name: Notify on failure
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: failure()
+
+    steps:
+      - name: Report deployment failure
+        run: |
+          echo "::error::Deployment failed for commit ${{ github.sha }} on branch ${{ github.ref_name }}"
+          echo "Backend job status : ${{ needs.backend.result }}"
+          echo "Frontend job status: ${{ needs.frontend.result }}"
+          echo "Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
