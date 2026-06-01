@@ -276,6 +276,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         properties = {
           title  = "ECS CPU & Memory"
+          region = "ap-southeast-1"
           period = 60
           metrics = [
             ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", aws_ecs_service.backend.name],
@@ -291,6 +292,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         properties = {
           title  = "ALB Request Count & Latency"
+          region = "ap-southeast-1"
           period = 60
           metrics = [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", aws_lb.main.arn_suffix],

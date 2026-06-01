@@ -99,7 +99,7 @@ resource "aws_security_group" "vpc_endpoint" {
 
 resource "aws_wafv2_web_acl" "main" {
   name        = "${var.project_name}-${var.environment}-waf"
-  description = "WAF for MoneyTrack ALB — rate limiting + managed rules"
+  description = "WAF for MoneyTrack ALB - rate limiting + managed rules"
   scope       = "REGIONAL" # REGIONAL for ALB; CLOUDFRONT for CloudFront
 
   default_action {
