@@ -35,18 +35,7 @@ resource "aws_acm_certificate" "api" {
   tags = { Name = "${var.project_name}-${var.environment}-api-cert" }
 }
 
-# Frontend certificate — MUST be in us-east-1 for CloudFront
-resource "aws_acm_certificate" "frontend" {
-  provider          = aws.us_east_1
-  domain_name       = "${var.frontend_subdomain}.${var.domain_name}"
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  tags = { Name = "${var.project_name}-${var.environment}-frontend-cert" }
-}
+# NOTE: Frontend TLS certificate is managed by Amplify automatically.
 
 # =============================================================================
 # ROUTE 53 — Hosted Zone & DNS Records
@@ -90,34 +79,10 @@ resource "aws_route53_record" "api_cert_validation" {
   zone_id         = local.route53_zone_id
 }
 
-# ACM DNS validation records — Frontend cert (us-east-1)
-resource "aws_route53_record" "frontend_cert_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.frontend.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
-    }
-  }
-
-  allow_overwrite = true
-  name            = each.value.name
-  records         = [each.value.record]
-  ttl             = 60
-  type            = each.value.type
-  zone_id         = local.route53_zone_id
-}
-
 # ACM certificate validation — wait for DNS propagation
 resource "aws_acm_certificate_validation" "api" {
   certificate_arn         = aws_acm_certificate.api.arn
   validation_record_fqdns = [for record in aws_route53_record.api_cert_validation : record.fqdn]
-}
-
-resource "aws_acm_certificate_validation" "frontend" {
-  provider                = aws.us_east_1
-  certificate_arn         = aws_acm_certificate.frontend.arn
-  validation_record_fqdns = [for record in aws_route53_record.frontend_cert_validation : record.fqdn]
 }
 
 # Route 53 — API record pointing to Global Accelerator
@@ -133,18 +98,7 @@ resource "aws_route53_record" "api" {
   }
 }
 
-# Route 53 — Frontend record pointing to CloudFront
-resource "aws_route53_record" "frontend" {
-  zone_id = local.route53_zone_id
-  name    = "${var.frontend_subdomain}.${var.domain_name}"
-  type    = "A"
-
-  alias {
-    name                   = aws_cloudfront_distribution.frontend.domain_name
-    zone_id                = aws_cloudfront_distribution.frontend.hosted_zone_id
-    evaluate_target_health = false
-  }
-}
+# Route 53 — Frontend DNS is managed by Amplify Domain Association (see aws_amplify_domain_association)
 
 # =============================================================================
 # AWS GLOBAL ACCELERATOR
