@@ -31,7 +31,7 @@ Refactor the existing flat Terraform layout into a three-layer hierarchy: bootst
   - Create terraform/modules/compute/outputs.tf: alb_dns_name, alb_arn, alb_arn_suffix, ecs_cluster_name, ecs_service_name, ecr_repository_url, ecr_repository_arn, ecs_task_execution_role_arn (passthrough var), ecs_task_role_arn (passthrough var)
   - **Requirements**: 2, 5, 16
 
-- [ ] 5. Create database module at terraform/modules/database/
+- [x] 5. Create database module at terraform/modules/database/
   - Create terraform/modules/database/main.tf with all three aws_dynamodb_table resources exactly as in database.tf: users (hash_key=userId S, GSI email-index hash=email S), categories (hash_key=categoryId S, GSI type-index hash=type S), transactions (hash_key=transactionId S, GSI userId-date-index hash=userId S range=date S). All three: billing_mode=PAY_PER_REQUEST, stream_enabled=var.dynamodb_enable_global_tables, stream_view_type=conditional, point_in_time_recovery enabled=var.dynamodb_point_in_time_recovery, server_side_encryption enabled=true, dynamic "replica" block (for_each: enable_global_tables?[secondary_region]:[]), lifecycle { prevent_destroy = true }
   - Create terraform/modules/database/variables.tf: project_name, environment, secondary_region, dynamodb_enable_global_tables (bool), dynamodb_point_in_time_recovery (bool), dynamodb_table_users, dynamodb_table_categories, dynamodb_table_transactions
   - Create terraform/modules/database/outputs.tf: users_table_name, users_table_arn, categories_table_name, categories_table_arn, transactions_table_name, transactions_table_arn
