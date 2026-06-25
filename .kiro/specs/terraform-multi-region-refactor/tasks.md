@@ -73,7 +73,7 @@ Refactor the existing flat Terraform layout into a three-layer hierarchy: bootst
   - Create terraform/environments/dev/ap-northeast-1/outputs.tf: 27 outputs — local module outputs via module.* where available; cross-region outputs (global_accelerator_*, api_url, frontend_url, route53_zone_id, jwt_secret_arn, amplify_*) reference var.* directly (e.g. jwt_secret_arn=var.jwt_secret_arn sensitive=true)
   - **Requirements**: 10, 11, 12, 13, 14, 15, 16, 18
 
-- [ ] 11. Create prod/ap-southeast-1 environment-region directory (primary, production)
+- [x] 11. Create prod/ap-southeast-1 environment-region directory (primary, production)
   - Create terraform/environments/prod/ap-southeast-1/backend.tf: key="prod/ap-southeast-1/terraform.tfstate" encrypt=true
   - Create terraform/environments/prod/ap-southeast-1/provider.tf: identical structure to dev/ap-southeast-1 (primary=ap-southeast-1, secondary=ap-northeast-1, us_east_1)
   - Create terraform/environments/prod/ap-southeast-1/main.tf: identical 7-module instantiation and wiring as dev/ap-southeast-1
@@ -82,7 +82,7 @@ Refactor the existing flat Terraform layout into a three-layer hierarchy: bootst
   - Create terraform/environments/prod/ap-southeast-1/outputs.tf: identical 27 outputs as dev/ap-southeast-1
   - **Requirements**: 10, 11, 12, 13, 14, 15, 16
 
-- [ ] 12. Create prod/ap-northeast-1 environment-region directory (secondary, production)
+- [x] 12. Create prod/ap-northeast-1 environment-region directory (secondary, production)
   - Create terraform/environments/prod/ap-northeast-1/backend.tf: key="prod/ap-northeast-1/terraform.tfstate" encrypt=true
   - Create terraform/environments/prod/ap-northeast-1/provider.tf: primary=ap-northeast-1, secondary=ap-southeast-1, us_east_1 alias
   - Create terraform/environments/prod/ap-northeast-1/main.tf: identical 6-module structure as dev/ap-northeast-1 (no global_services), same cross-module wiring
