@@ -13,7 +13,7 @@ Refactor the existing flat Terraform layout into a three-layer hierarchy: bootst
   - Create terraform/bootstrap/terraform.tfvars with concrete values matching variable defaults
   - **Requirements**: 1
 
-- [ ] 2. Create network module at terraform/modules/network/
+- [x] 2. Create network module at terraform/modules/network/
   - Create terraform/modules/network/main.tf with all resources from network.tf PLUS the three security groups from security.tf (to break the circular dependency): data "aws_availability_zones", aws_vpc, aws_subnet public/private (count), aws_internet_gateway, aws_eip nat (count, domain=vpc), aws_nat_gateway (count), aws_route_table public (IGW) + private (count, NAT GW per AZ), aws_route_table_association public/private, aws_vpc_endpoint dynamodb+s3 (Gateway, route_table_ids=private[*].id), aws_vpc_endpoint ecr_api/ecr_dkr/logs/secretsmanager/ssm (Interface, subnet_ids=private[*].id, security_group_ids=[vpc_endpoint.id], private_dns_enabled=true). Use var.primary_region in all service_name strings. aws_security_group "alb" (HTTP 80 + HTTPS 443 from 0.0.0.0/0), aws_security_group "ecs" (container_port from alb SG), aws_security_group "vpc_endpoint" (HTTPS 443 from vpc_cidr)
   - Create terraform/modules/network/variables.tf: project_name, environment, primary_region, vpc_cidr, public_subnet_cidrs (list(string)), private_subnet_cidrs (list(string)), container_port (number)
   - Create terraform/modules/network/outputs.tf: vpc_id, public_subnet_ids, private_subnet_ids, nat_gateway_public_ips, private_route_table_ids, vpc_endpoint_sg_id, alb_sg_id, ecs_sg_id
