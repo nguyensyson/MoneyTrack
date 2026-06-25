@@ -43,7 +43,7 @@ Refactor the existing flat Terraform layout into a three-layer hierarchy: bootst
   - Create terraform/modules/iam/outputs.tf: ecs_task_execution_role_arn, ecs_task_role_arn, github_actions_role_arn
   - **Requirements**: 2, 7, 16
 
-- [ ] 7. Create observability module at terraform/modules/observability/
+- [x] 7. Create observability module at terraform/modules/observability/
   - Create terraform/modules/observability/main.tf with CloudWatch/SNS resources from main.tf: aws_cloudwatch_metric_alarm ecs_cpu_high (GreaterThanThreshold, eval_periods=2, CPUUtilization AWS/ECS, period=60, Average, threshold=80, treat_missing=notBreaching, dims ClusterName+ServiceName, alarm+ok_actions=[sns]), aws_cloudwatch_metric_alarm alb_5xx (GreaterThanThreshold, eval_periods=1, HTTPCode_Target_5XX_Count AWS/ApplicationELB, period=300, Sum, threshold=10, treat_missing=notBreaching, dim LoadBalancer=var.alb_arn_suffix), aws_sns_topic alerts, aws_sns_topic_subscription alerts_email (count=alert_email!=""?1:0, email protocol), aws_cloudwatch_dashboard main (two widgets: ECS CPU+Memory and ALB RequestCount+TargetResponseTime using var.primary_region)
   - Create terraform/modules/observability/variables.tf: project_name, environment, primary_region, ecs_cluster_name, ecs_service_name, alb_arn_suffix, alert_email, sns_topic_name (default "")
   - Create terraform/modules/observability/outputs.tf: sns_alerts_topic_arn, cloudwatch_dashboard_name
