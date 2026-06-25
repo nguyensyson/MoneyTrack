@@ -19,7 +19,7 @@ Refactor the existing flat Terraform layout into a three-layer hierarchy: bootst
   - Create terraform/modules/network/outputs.tf: vpc_id, public_subnet_ids, private_subnet_ids, nat_gateway_public_ips, private_route_table_ids, vpc_endpoint_sg_id, alb_sg_id, ecs_sg_id
   - **Requirements**: 2, 3, 16, 18
 
-- [ ] 3. Create security module at terraform/modules/security/
+- [x] 3. Create security module at terraform/modules/security/
   - Create terraform/modules/security/main.tf with WAF-only resources (security groups moved to network module): aws_wafv2_web_acl "main" (scope=REGIONAL, default_action allow, Rule 1 RateLimitRule p1 block rate_based_statement limit=var.waf_rate_limit IP, Rule 2 AWSManagedRulesCommonRuleSet p2 override_action none, Rule 3 AWSManagedRulesKnownBadInputsRuleSet p3 override_action none — preserve all rule names/priorities/vendor names exactly); aws_wafv2_web_acl_association "alb" (resource_arn=var.alb_arn)
   - Create terraform/modules/security/variables.tf: project_name, environment, alb_arn, waf_rate_limit (number)
   - Create terraform/modules/security/outputs.tf: waf_web_acl_arn
