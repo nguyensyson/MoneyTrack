@@ -12,7 +12,7 @@ public interface CategoryService {
 
     CategoryResponse createCategory(CategoryRequest request);
 
-    CategoryResponse updateCategory(Long id, CategoryRequest request);
+    CategoryResponse updateCategory(String id, CategoryRequest request);
 
-    void deleteCategory(Long id);
+    void deleteCategory(String id);
 }

@@ -1,16 +1,16 @@
 # Deployment Guide — MoneyTrack BE
 
-End-to-end guide for building, pushing, and deploying the MoneyTrack backend to AWS ECS Fargate.
+End-to-end guide for building, pushing, and deploying the MoneyTrack backend to AWS ECS Fargate with Amazon DynamoDB.
 
 ---
 
 ## Prerequisites
 
-Make sure the following tools are installed and configured before you begin:
+Make sure the following tools are installed and configured:
 
 - **Docker** — [Install Docker](https://docs.docker.com/get-docker/)
-- **AWS CLI v2** — [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html), then run `aws configure` with your credentials and default region
-- **Terraform >= 1.0** — [Install Terraform](https://developer.hashicorp.com/terraform/install)
+- **AWS CLI v2** — [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html), then run `aws configure`
+- **Terraform >= 1.5** — [Install Terraform](https://developer.hashicorp.com/terraform/install)
 
 Verify everything is ready:
 
@@ -23,154 +23,177 @@ aws sts get-caller-identity   # confirms your AWS credentials are working
 
 ---
 
-## Step 1 — Build the Docker Image Locally
+## Local Development with DynamoDB Local
 
-From the project root, build the image using the multi-stage Dockerfile:
+To run the backend locally without connecting to AWS, use DynamoDB Local via Docker Compose:
+
+```bash
+# Start DynamoDB Local
+docker compose up dynamodb-local -d
+
+# Run the backend (in a separate terminal)
+export AWS_REGION=ap-southeast-1
+export AWS_ACCESS_KEY_ID=local
+export AWS_SECRET_ACCESS_KEY=local
+export DYNAMODB_ENDPOINT=http://localhost:8000
+export JWT_SECRET=local-dev-secret
+./mvnw spring-boot:run
+```
+
+On startup, `DynamoDbTableInitializer` automatically creates the required tables if they don't exist.
+`CategoryDataSeeder` seeds default categories on first run.
+
+---
+
+## Step 1 — Build the Docker Image
 
 ```bash
 docker build -t moneytrack-be:latest .
 ```
 
-To verify the image runs locally (optional):
+Test locally against DynamoDB Local:
 
 ```bash
 docker run --rm -p 8080:8080 \
-  -e SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/moneytrack \
-  -e SPRING_DATASOURCE_USERNAME=admin \
-  -e SPRING_DATASOURCE_PASSWORD=yourpassword \
-  -e JWT_SECRET=yoursecret \
+  -e AWS_REGION=ap-southeast-1 \
+  -e AWS_ACCESS_KEY_ID=local \
+  -e AWS_SECRET_ACCESS_KEY=local \
+  -e DYNAMODB_ENDPOINT=http://host.docker.internal:8000 \
+  -e JWT_SECRET=local-dev-secret \
   moneytrack-be:latest
 ```
 
 ---
 
-## Step 2 — Authenticate Docker to ECR and Push the Image
-
-First, retrieve the ECR repository URL from Terraform outputs (after Step 3), or look it up in the AWS Console. It follows the pattern:
-
-```
-<account_id>.dkr.ecr.<region>.amazonaws.com/moneytrack-be
-```
-
-Set it as a variable for convenience:
-
-```bash
-ECR_URL=<account_id>.dkr.ecr.<region>.amazonaws.com/moneytrack-be
-```
-
-Authenticate Docker to ECR:
-
-```bash
-aws ecr get-login-password --region <region> | \
-  docker login --username AWS --password-stdin <account_id>.dkr.ecr.<region>.amazonaws.com
-```
-
-Tag and push the image:
-
-```bash
-docker tag moneytrack-be:latest $ECR_URL:latest
-docker push $ECR_URL:latest
-```
-
-> Note: The ECR repository must exist before pushing. It is created by Terraform in Step 3. If this is your first deployment, run `terraform apply` first (Step 3), then come back to push the image, then force a new ECS deployment (see Step 4).
-
----
-
-## Step 3 — Provision Infrastructure with Terraform
-
-Navigate to the `terraform/` directory:
+## Step 2 — Provision Infrastructure with Terraform
 
 ```bash
 cd terraform
-```
-
-Initialize Terraform (downloads providers):
-
-```bash
 terraform init
 ```
 
-Review the execution plan. You will be prompted for sensitive variables (`db_password`, `jwt_secret`):
+Review the plan (only `jwt_secret` is required — no DB password needed):
 
 ```bash
-terraform plan \
-  -var="db_password=yourdbpassword" \
-  -var="jwt_secret=yourjwtsecret"
+terraform plan -var="jwt_secret=yourjwtsecret"
 ```
 
-Apply the infrastructure:
+Apply:
 
 ```bash
-terraform apply \
-  -var="db_password=yourdbpassword" \
-  -var="jwt_secret=yourjwtsecret"
+terraform apply -var="jwt_secret=yourjwtsecret"
 ```
 
-Type `yes` when prompted to confirm. This will provision:
+This provisions:
 - VPC, subnets, Internet Gateway, route tables
-- Security groups (ALB, ECS, RDS)
+- Security groups (ALB, ECS)
 - ECR repository
+- **3 DynamoDB tables** (users, categories, transactions) with GSIs
+- **IAM task role** with DynamoDB read/write permissions (no hard-coded credentials)
 - ECS cluster and Fargate task definition
-- RDS MySQL 8.0 instance
 - Application Load Balancer with HTTP listener
 
-> Tip: To avoid typing sensitive vars each time, create a `terraform/terraform.tfvars` file (already in `.gitignore`):
+> Tip: Create `terraform/terraform.tfvars` (already in `.gitignore`) to avoid typing vars each time:
 > ```hcl
-> db_password = "yourdbpassword"
-> jwt_secret  = "yourjwtsecret"
+> jwt_secret = "yourjwtsecret"
 > ```
+
+---
+
+## Step 3 — Push the Docker Image to ECR
+
+```bash
+ECR_URL=$(terraform output -raw ecr_repository_url)
+
+aws ecr get-login-password --region ap-southeast-1 | \
+  docker login --username AWS --password-stdin $ECR_URL
+
+docker tag moneytrack-be:latest $ECR_URL:latest
+docker push $ECR_URL:latest
+```
 
 ---
 
 ## Step 4 — Retrieve the Public API URL
 
-After `terraform apply` completes, retrieve the outputs:
-
 ```bash
 terraform output alb_dns_name
-terraform output ecr_repository_url
-terraform output rds_endpoint
 ```
 
-The `alb_dns_name` is your public API base URL:
-
-```
-http://<alb_dns_name>/
-```
-
-Test that the API is reachable:
+Test:
 
 ```bash
 curl http://$(terraform output -raw alb_dns_name)/
 ```
 
-> Allow 1–2 minutes after apply for the ECS task to start and pass the ALB health check.
+> Allow 1–2 minutes for the ECS task to start and pass the ALB health check.
 
 ---
 
 ## Redeploying After Image Updates
 
-When you push a new image to ECR, force ECS to pull it:
-
 ```bash
 aws ecs update-service \
   --cluster moneytrack-cluster \
-  --service moneytrack-be \
+  --service moneytrack-service \
   --force-new-deployment \
-  --region <region>
+  --region ap-southeast-1
 ```
 
 ---
 
 ## Tearing Down
 
-To destroy all provisioned AWS resources:
-
 ```bash
 cd terraform
-terraform destroy \
-  -var="db_password=yourdbpassword" \
-  -var="jwt_secret=yourjwtsecret"
+terraform destroy -var="jwt_secret=yourjwtsecret"
 ```
 
-> Warning: This will delete the RDS instance and all data. Set `skip_final_snapshot = false` in `main.tf` before destroying if you need a backup.
+> **Warning:** This deletes the DynamoDB tables and all data. Export data first if needed.
+
+---
+
+## Environment Variables Reference
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `PORT` | No | `8080` | Server port |
+| `AWS_REGION` | Yes | `ap-southeast-1` | AWS region |
+| `AWS_ACCESS_KEY_ID` | Local only | — | AWS access key (use IAM role on AWS) |
+| `AWS_SECRET_ACCESS_KEY` | Local only | — | AWS secret key (use IAM role on AWS) |
+| `DYNAMODB_ENDPOINT` | Local only | — | Override endpoint (DynamoDB Local / LocalStack) |
+| `DYNAMODB_TABLE_USERS` | No | `moneytrack-users` | Users table name |
+| `DYNAMODB_TABLE_CATEGORIES` | No | `moneytrack-categories` | Categories table name |
+| `DYNAMODB_TABLE_TRANSACTIONS` | No | `moneytrack-transactions` | Transactions table name |
+| `JWT_SECRET` | Yes | — | JWT signing key |
+| `JWT_EXPIRATION_MS` | No | `86400000` | JWT TTL in ms (24h) |
+
+---
+
+## Notes on Legacy MySQL Files
+
+The following files are **no longer used at runtime** and are kept only for historical reference.
+They can be safely deleted once the team confirms no rollback to MySQL is needed:
+
+**Entities (JPA):**
+- `entity/User.java`
+- `entity/Transaction.java`
+- `entity/Category.java`
+- `entity/Role.java`
+- `entity/BaseEntity.java`
+
+**Repositories (Spring Data JPA):**
+- `repository/UserRepository.java`
+- `repository/TransactionRepository.java`
+- `repository/CategoryRepository.java`
+- `repository/RoleRepository.java`
+
+**Config:**
+- `config/AuditingConfig.java`
+
+**Seed:**
+- `seed/RoleDataSeeder.java`
+
+**DTOs (JPA projections):**
+- `dto/response/DailyExpenseProjection.java`
+- `dto/response/MonthlyTransactionCountProjection.java`

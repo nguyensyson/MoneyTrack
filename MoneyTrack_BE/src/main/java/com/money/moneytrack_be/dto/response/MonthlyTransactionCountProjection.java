@@ -1,18 +1,16 @@
 package com.money.moneytrack_be.dto.response;
 
 /**
- * Spring Data JPA projection for the monthly transaction count query.
- * Maps the result of the GROUP BY aggregation in TransactionRepository.
+ * LEGACY — NOT USED IN RUNTIME.
+ *
+ * This was a Spring Data JPA projection interface for the MySQL GROUP BY DATE_FORMAT query
+ * in the old TransactionRepository. After migration to DynamoDB, monthly grouping
+ * is performed in-memory inside AdminStatisticsServiceImpl using Java streams.
+ *
+ * This file is retained for historical reference only and can be safely deleted.
  */
+@Deprecated(since = "DynamoDB migration", forRemoval = true)
 public interface MonthlyTransactionCountProjection {
-
-    /**
-     * Returns the year-month string in "yyyy-MM" format (e.g. "2026-01").
-     */
     String getYearMonth();
-
-    /**
-     * Returns the number of active transactions in that month.
-     */
     long getCount();
 }

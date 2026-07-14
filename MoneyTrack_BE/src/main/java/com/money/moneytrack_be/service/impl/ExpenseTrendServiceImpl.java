@@ -1,13 +1,12 @@
 package com.money.moneytrack_be.service.impl;
 
-import com.money.moneytrack_be.dto.response.DailyExpenseProjection;
 import com.money.moneytrack_be.dto.response.ExpenseTrendResponse;
-import com.money.moneytrack_be.entity.User;
-import com.money.moneytrack_be.enums.DeleteFlag;
+import com.money.moneytrack_be.entity.TransactionItem;
+import com.money.moneytrack_be.entity.UserItem;
 import com.money.moneytrack_be.enums.TransactionType;
 import com.money.moneytrack_be.exception.ResourceNotFoundException;
-import com.money.moneytrack_be.repository.TransactionRepository;
-import com.money.moneytrack_be.repository.UserRepository;
+import com.money.moneytrack_be.repository.TransactionDynamoRepository;
+import com.money.moneytrack_be.repository.UserDynamoRepository;
 import com.money.moneytrack_be.service.ExpenseTrendService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,24 +16,26 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ExpenseTrendServiceImpl implements ExpenseTrendService {
 
-    private final TransactionRepository transactionRepository;
-    private final UserRepository userRepository;
+    private final TransactionDynamoRepository transactionRepository;
+    private final UserDynamoRepository userRepository;
 
     @Override
     public ExpenseTrendResponse getExpenseTrend(String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
+        UserItem user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userEmail));
 
-        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth currentYearMonth  = YearMonth.now();
         YearMonth previousYearMonth = currentYearMonth.minusMonths(1);
 
-        List<BigDecimal> currentMonth = buildDailyTotals(user, currentYearMonth);
-        List<BigDecimal> previousMonth = buildDailyTotals(user, previousYearMonth);
+        List<BigDecimal> currentMonth  = buildDailyTotals(user.getUserId(), currentYearMonth);
+        List<BigDecimal> previousMonth = buildDailyTotals(user.getUserId(), previousYearMonth);
 
         return ExpenseTrendResponse.builder()
                 .currentMonth(currentMonth)
@@ -44,67 +45,59 @@ public class ExpenseTrendServiceImpl implements ExpenseTrendService {
 
     /**
      * Builds a cumulative daily expense array for the given month.
-     * The array length equals the number of days in the month.
-     * Each element at index i contains the running total of all EXPENSE
-     * transactions from day 1 through day i+1 (inclusive).
-     * Days with no transactions carry forward the previous day's cumulative total.
+     * Array length = number of days in the month.
+     * Each element at index i = running total from day 1 through day i+1 (inclusive).
+     * Future days in the current month are represented as null (no data yet).
      */
-    private List<BigDecimal> buildDailyTotals(User user, YearMonth yearMonth) {
-    int daysInMonth = yearMonth.lengthOfMonth();
-    LocalDate startDate = yearMonth.atDay(1);
-    LocalDate endDate = yearMonth.atEndOfMonth();
+    private List<BigDecimal> buildDailyTotals(String userId, YearMonth yearMonth) {
+        int daysInMonth = yearMonth.lengthOfMonth();
+        String startDate = yearMonth.atDay(1).toString();
+        String endDate   = yearMonth.atEndOfMonth().toString();
 
-    LocalDate today = LocalDate.now();
-    boolean isCurrentMonth = yearMonth.equals(YearMonth.from(today));
-    int currentDay = today.getDayOfMonth();
+        LocalDate today = LocalDate.now();
+        boolean isCurrentMonth = yearMonth.equals(YearMonth.from(today));
+        int currentDay = today.getDayOfMonth();
 
-    // Initialize all days to zero
-    BigDecimal[] totals = new BigDecimal[daysInMonth];
-    Arrays.fill(totals, BigDecimal.ZERO);
+        // Fetch all active EXPENSE transactions for this user/month
+        List<TransactionItem> expenses = transactionRepository
+                .findByUserIdAndDateRange(userId, startDate, endDate)
+                .stream()
+                .filter(t -> t.getDeleteFlag() == 0)
+                .filter(t -> TransactionType.EXPENSE.name().equals(t.getType()))
+                .collect(Collectors.toList());
 
-    // Fetch aggregated daily totals from the database
-    List<DailyExpenseProjection> projections = transactionRepository.findDailyExpenseTotals(
-            user,
-            DeleteFlag.ACTIVE,
-            TransactionType.EXPENSE,
-            startDate,
-            endDate
-    );
+        // Aggregate by day-of-month
+        Map<Integer, BigDecimal> dailyMap = expenses.stream()
+                .collect(Collectors.groupingBy(
+                        t -> LocalDate.parse(t.getDate()).getDayOfMonth(),
+                        Collectors.reducing(BigDecimal.ZERO,
+                                t -> new BigDecimal(t.getAmount()),
+                                BigDecimal::add)
+                ));
 
-    // Map daily raw values
-    BigDecimal[] dailyValues = new BigDecimal[daysInMonth];
-    Arrays.fill(dailyValues, BigDecimal.ZERO);
+        // Build cumulative array
+        BigDecimal[] totals = new BigDecimal[daysInMonth];
+        Arrays.fill(totals, BigDecimal.ZERO);
 
-    for (DailyExpenseProjection projection : projections) {
-        int index = projection.getDayOfMonth() - 1;
-        if (index >= 0 && index < daysInMonth) {
-            dailyValues[index] = projection.getTotalAmount();
-        }
-    }
+        BigDecimal runningTotal = BigDecimal.ZERO;
+        for (int i = 0; i < daysInMonth; i++) {
+            int day = i + 1;
+            BigDecimal dayAmount = dailyMap.getOrDefault(day, BigDecimal.ZERO);
 
-    // Cumulative logic with future-day rule
-    BigDecimal runningTotal = BigDecimal.ZERO;
-
-    for (int i = 0; i < daysInMonth; i++) {
-        int day = i + 1;
-
-        // Nếu là tháng hiện tại và là ngày tương lai
-        if (isCurrentMonth && day > currentDay) {
-            if (dailyValues[i].compareTo(BigDecimal.ZERO) > 0) {
-                // Có transaction future → vẫn cộng tiếp
-                runningTotal = runningTotal.add(dailyValues[i]);
-                totals[i] = runningTotal;
+            if (isCurrentMonth && day > currentDay) {
+                // Future day: carry null if no data, otherwise accumulate
+                if (dayAmount.compareTo(BigDecimal.ZERO) > 0) {
+                    runningTotal = runningTotal.add(dayAmount);
+                    totals[i] = runningTotal;
+                } else {
+                    totals[i] = null;
+                }
             } else {
-                // Không có transaction → trả về 0
-                totals[i] = null;
+                runningTotal = runningTotal.add(dayAmount);
+                totals[i] = runningTotal;
             }
-        } else {
-            // Ngày trong quá khứ hoặc tháng trước → cumulative bình thường
-            runningTotal = runningTotal.add(dailyValues[i]);
-            totals[i] = runningTotal;
         }
-    }
 
-    return Arrays.asList(totals);
-}
+        return Arrays.asList(totals);
+    }
 }

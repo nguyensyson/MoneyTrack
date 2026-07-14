@@ -3,7 +3,7 @@ package com.money.moneytrack_be.controller;
 import com.money.moneytrack_be.dto.request.TransactionRequest;
 import com.money.moneytrack_be.dto.response.ExpenseTrendResponse;
 import com.money.moneytrack_be.dto.response.TransactionResponse;
-import com.money.moneytrack_be.entity.Transaction;
+import com.money.moneytrack_be.entity.TransactionItem;
 import com.money.moneytrack_be.service.ExpenseTrendService;
 import com.money.moneytrack_be.service.TransactionService;
 import jakarta.validation.Valid;
@@ -34,7 +34,7 @@ public class TransactionController {
     public ResponseEntity<TransactionResponse> create(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody TransactionRequest request) {
-        Transaction transaction = transactionService.create(
+        TransactionItem transaction = transactionService.create(
                 userDetails.getUsername(),
                 request.getAmount(),
                 request.getType(),
@@ -49,7 +49,7 @@ public class TransactionController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String categoryId,
             @PageableDefault(size = 20, sort = "date") Pageable pageable) {
         Page<TransactionResponse> page = transactionService
                 .getTransactions(userDetails.getUsername(), month, year, categoryId, pageable)
@@ -60,9 +60,9 @@ public class TransactionController {
     @PutMapping("/{id}")
     public ResponseEntity<TransactionResponse> update(
             @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody TransactionRequest request) {
-        Transaction transaction = transactionService.update(
+        TransactionItem transaction = transactionService.update(
                 userDetails.getUsername(),
                 id,
                 request.getAmount(),
@@ -76,7 +76,7 @@ public class TransactionController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long id) {
+            @PathVariable String id) {
         transactionService.delete(userDetails.getUsername(), id);
         return ResponseEntity.noContent().build();
     }
@@ -85,8 +85,8 @@ public class TransactionController {
     public ResponseEntity<byte[]> exportCsv(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam String month,
-            @RequestParam(required = false) Long categoryId) {
-        List<Transaction> transactions = transactionService.getTransactionsForExport(
+            @RequestParam(required = false) String categoryId) {
+        List<TransactionItem> transactions = transactionService.getTransactionsForExport(
                 userDetails.getUsername(), month, categoryId);
         byte[] csvBytes = transactionService.buildCsvBytesPublic(transactions);
         String filename = transactionService.buildExportFilename(month, categoryId, transactions);
@@ -103,7 +103,7 @@ public class TransactionController {
     public ResponseEntity<ExpenseTrendResponse> getExpenseTrend(
             @AuthenticationPrincipal UserDetails userDetails) {
         return ResponseEntity.ok(
-            expenseTrendService.getExpenseTrend(userDetails.getUsername())
+                expenseTrendService.getExpenseTrend(userDetails.getUsername())
         );
     }
 }

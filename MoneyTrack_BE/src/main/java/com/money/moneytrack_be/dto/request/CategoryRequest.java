@@ -16,5 +16,6 @@ public class CategoryRequest {
     @NotNull
     private CategoryType type;
 
-    private Long parentId;
+    /** UUID string of the parent category, or null for root categories. */
+    private String parentId;
 }

@@ -1,41 +1,15 @@
 package com.money.moneytrack_be.seed;
 
-import com.money.moneytrack_be.entity.Role;
-import com.money.moneytrack_be.enums.RoleName;
-import com.money.moneytrack_be.repository.RoleRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.stereotype.Component;
-
-import java.util.List;
-
-@Component
-@RequiredArgsConstructor
-public class RoleDataSeeder implements ApplicationRunner {
-
-    private final RoleRepository roleRepository;
-
-    @Override
-    public void run(ApplicationArguments args) {
-        if (roleRepository.count() > 0) {
-            return;
-        }
-
-        seedRoles();
-    }
-
-    private void seedRoles() {
-        saveRoles(List.of(RoleName.USER, RoleName.ADMIN));
-    }
-
-    private void saveRoles(List<RoleName> roleNames) {
-        roleNames.forEach(role ->
-                roleRepository.save(
-                        Role.builder()
-                                .name(role)
-                                .build()
-                )
-        );
-    }
+/**
+ * RoleDataSeeder — NOT USED.
+ *
+ * Roles are no longer stored in a separate DynamoDB table.
+ * User roles are stored directly as a Set<String> inside the UserItem
+ * in the "moneytrack-users" table (e.g. {"USER"} or {"ADMIN"}).
+ *
+ * This file is kept for reference only and does nothing at runtime.
+ * It can be safely deleted once the team confirms no rollback to MySQL is needed.
+ */
+public class RoleDataSeeder {
+    // intentionally empty — see Javadoc above
 }

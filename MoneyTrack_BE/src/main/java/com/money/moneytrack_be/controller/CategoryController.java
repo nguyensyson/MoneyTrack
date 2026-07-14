@@ -33,14 +33,15 @@ public class CategoryController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<CategoryResponse> updateCategory(@PathVariable Long id,
-                                                           @Valid @RequestBody CategoryRequest request) {
+    public ResponseEntity<CategoryResponse> updateCategory(
+            @PathVariable String id,
+            @Valid @RequestBody CategoryRequest request) {
         return ResponseEntity.ok(categoryService.updateCategory(id, request));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteCategory(@PathVariable String id) {
         categoryService.deleteCategory(id);
         return ResponseEntity.noContent().build();
     }

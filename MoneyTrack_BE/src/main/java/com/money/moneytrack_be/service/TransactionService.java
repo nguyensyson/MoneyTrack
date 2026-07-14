@@ -1,6 +1,6 @@
 package com.money.moneytrack_be.service;
 
-import com.money.moneytrack_be.entity.Transaction;
+import com.money.moneytrack_be.entity.TransactionItem;
 import com.money.moneytrack_be.enums.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,20 +11,20 @@ import java.util.List;
 
 public interface TransactionService {
 
-    Transaction create(String userEmail, BigDecimal amount, TransactionType type,
-                       Long categoryId, String description, LocalDate date);
+    TransactionItem create(String userEmail, BigDecimal amount, TransactionType type,
+                           String categoryId, String description, LocalDate date);
 
-    Page<Transaction> getTransactions(String userEmail, Integer month, Integer year,
-                                      Long categoryId, Pageable pageable);
+    Page<TransactionItem> getTransactions(String userEmail, Integer month, Integer year,
+                                          String categoryId, Pageable pageable);
 
-    Transaction update(String userEmail, Long transactionId, BigDecimal amount,
-                       TransactionType type, Long categoryId, String description, LocalDate date);
+    TransactionItem update(String userEmail, String transactionId, BigDecimal amount,
+                           TransactionType type, String categoryId, String description, LocalDate date);
 
-    void delete(String userEmail, Long transactionId);
+    void delete(String userEmail, String transactionId);
 
-    List<Transaction> getTransactionsForExport(String userEmail, String month, Long categoryId);
+    List<TransactionItem> getTransactionsForExport(String userEmail, String month, String categoryId);
 
-    byte[] buildCsvBytesPublic(List<Transaction> transactions);
+    byte[] buildCsvBytesPublic(List<TransactionItem> transactions);
 
-    String buildExportFilename(String month, Long categoryId, List<Transaction> transactions);
+    String buildExportFilename(String month, String categoryId, List<TransactionItem> transactions);
 }

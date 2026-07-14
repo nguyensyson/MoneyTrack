@@ -1,24 +1,15 @@
 package com.money.moneytrack_be.config;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.data.domain.AuditorAware;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-
-import java.util.Optional;
-
-@Configuration
+/**
+ * LEGACY — NOT USED IN RUNTIME.
+ *
+ * This configuration provided Spring Data JPA auditing (AuditorAware) when the backend
+ * used MySQL. After migration to DynamoDB, auditing timestamps (createdAt, updatedAt)
+ * are set manually as ISO-8601 strings using Instant.now().toString() in each service.
+ *
+ * This file is retained for historical reference only and can be safely deleted.
+ */
+@Deprecated(since = "DynamoDB migration", forRemoval = true)
 public class AuditingConfig {
-
-    @Bean
-    public AuditorAware<String> auditorProvider() {
-        return () -> {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth == null || !auth.isAuthenticated() || auth.getPrincipal().equals("anonymousUser")) {
-                return Optional.of("system");
-            }
-            return Optional.of(auth.getName());
-        };
-    }
+    // intentionally empty — see Javadoc above
 }
