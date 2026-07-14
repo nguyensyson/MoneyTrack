@@ -39,15 +39,9 @@ module "global_services" {
   primary_region                = var.primary_region
   domain_name                   = var.domain_name
   api_subdomain                 = var.api_subdomain
-  frontend_subdomain            = var.frontend_subdomain
   create_route53_zone           = var.create_route53_zone
   alb_arn                       = module.compute.alb_arn
   alb_logs_bucket_force_destroy = var.environment != "prod"
-  jwt_secret                    = var.jwt_secret
-  github_org                    = var.github_org
-  github_repo                   = var.github_repo
-  github_token                  = var.github_token
-  amplify_branch                = var.amplify_branch
   alert_email                   = var.alert_email
 }
 

@@ -38,18 +38,3 @@ output "api_url" {
   description = "Public API URL"
   value       = "https://${var.api_subdomain}.${var.domain_name}"
 }
-
-output "frontend_url" {
-  description = "Public frontend URL"
-  value       = "https://${var.frontend_subdomain}.${var.domain_name}"
-}
-
-output "amplify_app_id" {
-  description = "AWS Amplify app ID"
-  value       = aws_amplify_app.frontend.id
-}
-
-output "amplify_default_domain" {
-  description = "Amplify default domain"
-  value       = aws_amplify_app.frontend.default_domain
-}

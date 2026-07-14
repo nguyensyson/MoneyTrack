@@ -87,11 +87,6 @@ output "api_url" {
   value       = module.global_services.api_url
 }
 
-output "frontend_url" {
-  description = "Full HTTPS URL of the frontend"
-  value       = module.global_services.frontend_url
-}
-
 output "route53_zone_id" {
   description = "Route 53 hosted zone ID"
   value       = module.global_services.route53_zone_id
@@ -154,16 +149,4 @@ output "cloudwatch_dashboard_url" {
 output "sns_alerts_topic_arn" {
   description = "ARN of the SNS alerts topic"
   value       = module.observability.sns_alerts_topic_arn
-}
-
-# --- Amplify ---
-
-output "amplify_app_id" {
-  description = "Amplify application ID"
-  value       = module.global_services.amplify_app_id
-}
-
-output "amplify_default_domain" {
-  description = "Amplify default domain"
-  value       = module.global_services.amplify_default_domain
 }

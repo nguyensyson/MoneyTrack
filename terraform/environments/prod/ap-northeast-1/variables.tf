@@ -2,9 +2,9 @@
 # prod / ap-northeast-1 — Variable Declarations (Secondary Region)
 #
 # This directory does not instantiate global_services.
-# Variables for jwt_secret, github_token, domain_name, api_subdomain,
-# frontend_subdomain, create_route53_zone, and amplify_branch are omitted
-# as they are only needed by the global_services module in the primary region.
+# Variables for jwt_secret, domain_name, api_subdomain, and
+# create_route53_zone are omitted as they are only needed by the
+# global_services module in the primary region.
 # =============================================================================
 
 variable "project_name" {
@@ -146,12 +146,6 @@ variable "create_github_oidc_provider" {
   description = "Set to true to create the GitHub OIDC provider; false if it already exists in the account"
   type        = bool
   default     = false
-}
-
-variable "amplify_branch" {
-  description = "Git branch to connect to Amplify for the frontend deployment"
-  type        = string
-  default     = "main"
 }
 
 variable "alert_email" {

@@ -23,11 +23,6 @@ variable "api_subdomain" {
   type        = string
 }
 
-variable "frontend_subdomain" {
-  description = "Subdomain for the frontend (e.g. www)"
-  type        = string
-}
-
 variable "create_route53_zone" {
   description = "true = create a new Route 53 zone; false = look up existing zone"
   type        = bool
@@ -41,33 +36,6 @@ variable "alb_arn" {
 variable "alb_logs_bucket_force_destroy" {
   description = "Allow non-empty S3 bucket to be destroyed (true for non-prod)"
   type        = bool
-}
-
-variable "jwt_secret" {
-  description = "JWT signing secret value — stored in Secrets Manager"
-  type        = string
-  sensitive   = true
-}
-
-variable "github_org" {
-  description = "GitHub organization or username — used in Amplify repository URL"
-  type        = string
-}
-
-variable "github_repo" {
-  description = "GitHub repository name — used in Amplify repository URL"
-  type        = string
-}
-
-variable "github_token" {
-  description = "GitHub OAuth token for Amplify"
-  type        = string
-  sensitive   = true
-}
-
-variable "amplify_branch" {
-  description = "Git branch to deploy via Amplify"
-  type        = string
 }
 
 variable "alert_email" {

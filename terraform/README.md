@@ -8,7 +8,7 @@ Terraform code để triển khai toàn bộ hạ tầng AWS cho dự án MoneyT
 
 ```
 User
-├── www.moneytrack.com  →  Route 53  →  CloudFront  →  S3 (static) / Amplify
+├── www.moneytrack.com  →  Route 53  →  CloudFront  →  S3 (static)
 └── api.moneytrack.com  →  Route 53  →  Global Accelerator
                                               └──  ALB (public subnet)
                                                     └──  AWS WAF
@@ -31,7 +31,7 @@ User
 | `compute.tf` | ECR, ECS Cluster/Service/Task, ALB, Auto Scaling |
 | `database.tf` | DynamoDB Global Tables (users, categories, transactions) |
 | `storage.tf` | S3 (frontend, ALB logs), CloudFront distribution |
-| `main.tf` | Secrets Manager, ACM, Route 53, Global Accelerator, CloudWatch, Amplify |
+| `main.tf` | Secrets Manager, ACM, Route 53, Global Accelerator, CloudWatch |
 | `outputs.tf` | Tất cả output quan trọng |
 | `terraform.tfvars.example` | Template biến — copy thành `terraform.tfvars` |
 
@@ -74,7 +74,6 @@ User
 - S3 Bucket: Frontend static assets (private, OAC)
 - S3 Bucket: ALB access logs
 - CloudFront Distribution (HTTPS, SPA fallback, OAC)
-- AWS Amplify App (CI/CD từ GitHub)
 
 ### DNS & Networking
 - Route 53 Records (A alias: api → Global Accelerator, www → CloudFront)
@@ -147,10 +146,11 @@ terraform apply tfplan
 
 | Biến | Mô tả |
 |---|---|
-| `jwt_secret` | JWT signing key (min 32 chars) |
 | `domain_name` | Root domain (e.g. `moneytrack.com`) |
 | `github_org` | GitHub org/username |
 | `github_repo` | GitHub repo name |
+
+> `jwt_secret` không còn là biến đầu vào — Terraform tự sinh ngẫu nhiên (`random_password`) và lưu vào Secrets Manager.
 
 ---
 
@@ -159,7 +159,6 @@ terraform apply tfplan
 ```bash
 terraform output ecr_repository_url        # Push Docker image vào đây
 terraform output api_url                   # URL API backend
-terraform output frontend_url              # URL frontend
 terraform output global_accelerator_static_ips  # Whitelist IPs nếu cần
 terraform output github_actions_role_arn   # Dùng trong GitHub Actions workflow
 terraform output cloudwatch_dashboard_url  # Link dashboard monitoring
@@ -195,15 +194,11 @@ ECS_CLUSTER  = <ecs_cluster_name output>
 ECS_SERVICE  = <ecs_service_name output>
 ```
 
-### 5. Amplify — Kết nối GitHub
-- Lần đầu deploy Amplify cần authorize GitHub OAuth trong Console
-- Vào **Amplify → App → Connect branch** nếu auto-build không trigger
-
-### 6. DynamoDB Global Tables — Secondary region setup
+### 5. DynamoDB Global Tables — Secondary region setup
 - Nếu `dynamodb_enable_global_tables = true`, đảm bảo secondary region đã được enable trong AWS account
 - Kiểm tra replication status trong Console sau apply
 
-### 7. WAF — Tuning rules
+### 6. WAF — Tuning rules
 - Sau khi deploy, monitor WAF logs trong CloudWatch
 - Điều chỉnh rate limit và managed rules nếu có false positives
 
@@ -212,9 +207,7 @@ ECS_SERVICE  = <ecs_service_name output>
 ## Giả định khi thiết kế
 
 1. **Single ECR registry** — dùng chung cho cả 2 regions (ECR là global per account)
-2. **Amplify cho frontend** — kiến trúc ảnh có cả CloudFront + Amplify; Terraform tạo cả hai, team chọn một
-3. **DynamoDB Global Tables** — replication sang secondary region cho DR; có thể tắt bằng `dynamodb_enable_global_tables = false`
-4. **NAT Gateway per AZ** — 2 NAT GW cho HA; có thể giảm xuống 1 để tiết kiệm chi phí dev/staging
-5. **ECS Exec enabled** — cho phép debug container qua SSM Session Manager mà không cần SSH
-6. **`prevent_destroy = true`** trên DynamoDB tables — bảo vệ data production; xóa lifecycle block nếu cần destroy
-7. **Amplify branch = main** — CI/CD tự động khi push lên `main`; thay đổi qua biến `amplify_branch`
+2. **DynamoDB Global Tables** — replication sang secondary region cho DR; có thể tắt bằng `dynamodb_enable_global_tables = false`
+3. **NAT Gateway per AZ** — 2 NAT GW cho HA; có thể giảm xuống 1 để tiết kiệm chi phí dev/staging
+4. **ECS Exec enabled** — cho phép debug container qua SSM Session Manager mà không cần SSH
+5. **`prevent_destroy = true`** trên DynamoDB tables — bảo vệ data production; xóa lifecycle block nếu cần destroy

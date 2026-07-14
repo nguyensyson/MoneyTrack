@@ -53,12 +53,6 @@ variable "api_subdomain" {
   default     = "api"
 }
 
-variable "frontend_subdomain" {
-  description = "Subdomain for the frontend (e.g. www)"
-  type        = string
-  default     = "www"
-}
-
 variable "create_route53_zone" {
   description = "true = create a new Route 53 hosted zone; false = look up existing zone"
   type        = bool
@@ -143,13 +137,6 @@ variable "dynamodb_point_in_time_recovery" {
   default     = true
 }
 
-# Sensitive — no default. Supply via TF_VAR_jwt_secret environment variable.
-variable "jwt_secret" {
-  description = "JWT signing secret value stored in Secrets Manager"
-  type        = string
-  sensitive   = true
-}
-
 variable "waf_rate_limit" {
   description = "Maximum requests per 5-minute window per IP (WAF rate-based rule)"
   type        = number
@@ -168,23 +155,10 @@ variable "github_repo" {
   default     = "MoneyTrack_BE"
 }
 
-# Sensitive — no default. Supply via TF_VAR_github_token environment variable.
-variable "github_token" {
-  description = "GitHub personal access token for Amplify source connection"
-  type        = string
-  sensitive   = true
-}
-
 variable "create_github_oidc_provider" {
   description = "Set to true to create the GitHub OIDC provider; false if it already exists in the account"
   type        = bool
   default     = false
-}
-
-variable "amplify_branch" {
-  description = "Git branch to connect to Amplify for frontend deployment"
-  type        = string
-  default     = "main"
 }
 
 variable "alert_email" {

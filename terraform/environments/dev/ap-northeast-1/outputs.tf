@@ -87,11 +87,6 @@ output "api_url" {
   value       = "N/A - managed by primary region (ap-southeast-1)"
 }
 
-output "frontend_url" {
-  description = "Full HTTPS URL of the frontend — managed by primary region (ap-southeast-1)"
-  value       = "N/A - managed by primary region (ap-southeast-1)"
-}
-
 output "route53_zone_id" {
   description = "Route 53 hosted zone ID — managed by primary region (ap-southeast-1)"
   value       = "N/A - managed by primary region (ap-southeast-1)"
@@ -154,16 +149,4 @@ output "cloudwatch_dashboard_url" {
 output "sns_alerts_topic_arn" {
   description = "ARN of the SNS alerts topic"
   value       = module.observability.sns_alerts_topic_arn
-}
-
-# --- Amplify (cross-region — no global_services in this region) ---
-
-output "amplify_app_id" {
-  description = "Amplify application ID — managed by primary region (ap-southeast-1)"
-  value       = "N/A - managed by primary region (ap-southeast-1)"
-}
-
-output "amplify_default_domain" {
-  description = "Amplify default domain — managed by primary region (ap-southeast-1)"
-  value       = "N/A - managed by primary region (ap-southeast-1)"
 }
