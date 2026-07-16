@@ -22,14 +22,14 @@ resource "aws_vpc" "main" {
 # SUBNETS
 # =============================================================================
 
-# Public subnets — NAT Gateway, ALB
+# Public subnets — ALB
 resource "aws_subnet" "public" {
   count = length(var.public_subnet_cidrs)
 
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.public_subnet_cidrs[count.index]
   availability_zone       = data.aws_availability_zones.available.names[count.index]
-  map_public_ip_on_launch = false # ALB and NAT GW get EIPs; no need for auto-assign
+  map_public_ip_on_launch = false # ALB gets EIPs; no need for auto-assign
 
   tags = {
     Name = "${var.project_name}-${var.environment}-public-${count.index + 1}"
@@ -62,30 +62,6 @@ resource "aws_internet_gateway" "main" {
 }
 
 # =============================================================================
-# NAT GATEWAY (one per AZ for HA — ECS tasks in private subnets need outbound)
-# =============================================================================
-
-resource "aws_eip" "nat" {
-  count  = length(var.public_subnet_cidrs)
-  domain = "vpc"
-
-  tags = { Name = "${var.project_name}-${var.environment}-nat-eip-${count.index + 1}" }
-
-  depends_on = [aws_internet_gateway.main]
-}
-
-resource "aws_nat_gateway" "main" {
-  count = length(var.public_subnet_cidrs)
-
-  allocation_id = aws_eip.nat[count.index].id
-  subnet_id     = aws_subnet.public[count.index].id
-
-  tags = { Name = "${var.project_name}-${var.environment}-nat-${count.index + 1}" }
-
-  depends_on = [aws_internet_gateway.main]
-}
-
-# =============================================================================
 # ROUTE TABLES
 # =============================================================================
 
@@ -108,15 +84,10 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Private route tables — one per AZ, each routes through its own NAT GW
+# Private route tables — one per AZ (no default route: no NAT, no outbound internet)
 resource "aws_route_table" "private" {
   count  = length(aws_subnet.private)
   vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main[count.index].id
-  }
 
   tags = { Name = "${var.project_name}-${var.environment}-private-rt-${count.index + 1}" }
 }
@@ -176,7 +147,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   tags = { Name = "${var.project_name}-${var.environment}-ecr-dkr-endpoint" }
 }
 
-# Interface Endpoint for CloudWatch Logs — allows ECS to push logs without NAT
+# Interface Endpoint for CloudWatch Logs — allows ECS to push logs
 resource "aws_vpc_endpoint" "logs" {
   vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${var.primary_region}.logs"
@@ -268,7 +239,7 @@ resource "aws_security_group" "ecs" {
   }
 
   egress {
-    description = "All outbound (NAT GW / VPC Endpoints)"
+    description = "All outbound (VPC Endpoints)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

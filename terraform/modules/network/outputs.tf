@@ -13,11 +13,6 @@ output "private_subnet_ids" {
   value       = aws_subnet.private[*].id
 }
 
-output "nat_gateway_public_ips" {
-  description = "Elastic IPs of the NAT Gateways"
-  value       = aws_eip.nat[*].public_ip
-}
-
 output "private_route_table_ids" {
   description = "IDs of the private route tables (one per AZ)"
   value       = aws_route_table.private[*].id

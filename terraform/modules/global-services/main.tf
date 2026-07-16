@@ -29,10 +29,10 @@ resource "aws_secretsmanager_secret" "jwt_secret" {
   recovery_window_in_days = var.environment == "prod" ? 30 : 0
 
   tags = {
-    Name      = "${var.project_name}-${var.environment}-jwt-secret"
-    Project   = var.project_name
+    Name        = "${var.project_name}-${var.environment}-jwt-secret"
+    Project     = var.project_name
     Environment = var.environment
-    ManagedBy = "Terraform"
+    ManagedBy   = "Terraform"
   }
 }
 
