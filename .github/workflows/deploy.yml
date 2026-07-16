@@ -2,8 +2,9 @@
 # MoneyTrack — CI/CD Pipeline
 #
 # Architecture:
-#   Backend  → Docker image → ECR → ECS Fargate (via ALB + Global Accelerator)
-#   Frontend → AWS Amplify  (auto-build triggered by push to main)
+#   Backend → Docker image → ECR → ECS Fargate (via ALB + Global Accelerator)
+#
+# Frontend CI/CD is not set up yet.
 #
 # Auth: GitHub OIDC → IAM Role (no long-lived AWS keys stored in secrets)
 # =============================================================================
@@ -18,12 +19,6 @@ on:
     inputs:
       deploy_backend:
         description: "Deploy backend to ECS?"
-        required: false
-        default: "true"
-        type: choice
-        options: ["true", "false"]
-      deploy_frontend:
-        description: "Trigger Amplify frontend build?"
         required: false
         default: "true"
         type: choice
@@ -45,8 +40,6 @@ env:
   ECS_SERVICE: ${{ vars.ECS_SERVICE_NAME }}
   ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY }}
   CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
-  AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
-  AMPLIFY_BRANCH: ${{ vars.AMPLIFY_BRANCH }}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 1 — Backend: Test → Build → Push to ECR → Deploy to ECS
@@ -207,123 +200,12 @@ jobs:
           echo "Deployed image: ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}"
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 2 — Frontend: Test → Trigger Amplify build
-  # ─────────────────────────────────────────────────────────────────────────────
-  frontend:
-    name: Frontend — Test & Trigger Amplify
-    runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_frontend == 'true')
-
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────────
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      # ── 2. Set up Node.js + pnpm ─────────────────────────────────────────────
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Enable pnpm via corepack
-        run: corepack enable && corepack prepare pnpm@latest --activate
-
-      # ── 3. Install dependencies ───────────────────────────────────────────────
-      - name: Install frontend dependencies
-        working-directory: MoneyTrack_FE
-        run: pnpm install --frozen-lockfile
-
-      # ── 4. Run frontend tests ─────────────────────────────────────────────────
-      - name: Run frontend tests
-        working-directory: MoneyTrack_FE
-        run: pnpm vitest run --reporter=verbose
-
-      # ── 5. Build frontend (smoke check) ──────────────────────────────────────
-      # This catches build-time errors before Amplify runs its own build.
-      # NEXT_PUBLIC_API_URL is set to a placeholder — Amplify will override it.
-      - name: Build frontend (smoke check)
-        working-directory: MoneyTrack_FE
-        env:
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
-          NEXT_TELEMETRY_DISABLED: "1"
-        run: pnpm build
-
-      # ── 6. Configure AWS credentials via OIDC ────────────────────────────────
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: github-actions-moneytrack-fe-${{ github.run_id }}
-
-      # ── 7. Trigger Amplify build ──────────────────────────────────────────────
-      # Amplify has enable_auto_build = true, so a push to main already triggers
-      # a build automatically. This step is a manual trigger for workflow_dispatch
-      # or to force a rebuild after infrastructure changes.
-      - name: Trigger Amplify build
-        run: |
-          JOB_ID=$(aws amplify start-job \
-            --app-id "${{ env.AMPLIFY_APP_ID }}" \
-            --branch-name "${{ env.AMPLIFY_BRANCH }}" \
-            --job-type RELEASE \
-            --query 'jobSummary.jobId' \
-            --output text)
-
-          echo "Amplify build triggered. Job ID: ${JOB_ID}"
-          echo "Monitor at: https://${{ env.AMPLIFY_BRANCH }}.${{ env.AMPLIFY_APP_ID }}.amplifyapp.com"
-
-      # ── 8. Wait for Amplify build to complete ────────────────────────────────
-      - name: Wait for Amplify build
-        run: |
-          echo "Polling Amplify build status (max 10 minutes)..."
-          MAX_ATTEMPTS=20
-          SLEEP_SECONDS=30
-
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            STATUS=$(aws amplify list-jobs \
-              --app-id "${{ env.AMPLIFY_APP_ID }}" \
-              --branch-name "${{ env.AMPLIFY_BRANCH }}" \
-              --max-results 1 \
-              --query 'jobSummaries[0].status' \
-              --output text)
-
-            echo "Attempt ${i}/${MAX_ATTEMPTS} — Amplify status: ${STATUS}"
-
-            case "$STATUS" in
-              SUCCEED)
-                echo "Amplify build succeeded."
-                exit 0
-                ;;
-              FAILED|CANCELLED)
-                echo "Amplify build failed with status: ${STATUS}"
-                exit 1
-                ;;
-              RUNNING|PENDING|PROVISIONING)
-                sleep $SLEEP_SECONDS
-                ;;
-              *)
-                echo "Unknown status: ${STATUS}. Retrying..."
-                sleep $SLEEP_SECONDS
-                ;;
-            esac
-          done
-
-          echo "Timed out waiting for Amplify build."
-          exit 1
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 3 — Notify on failure
+  # JOB 2 — Notify on failure
   # ─────────────────────────────────────────────────────────────────────────────
   notify-failure:
     name: Notify on failure
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [backend]
     if: failure()
 
     steps:
@@ -331,5 +213,4 @@ jobs:
         run: |
           echo "::error::Deployment failed for commit ${{ github.sha }} on branch ${{ github.ref_name }}"
           echo "Backend job status : ${{ needs.backend.result }}"
-          echo "Frontend job status: ${{ needs.frontend.result }}"
           echo "Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

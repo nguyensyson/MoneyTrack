@@ -26,62 +26,80 @@ services:
       - "8000:8000"
     command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000 || exit 1"]
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8000 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Backend — Spring Boot 3.3.5 / Java 17
+  # dynamodb-admin — web UI to browse/edit DynamoDB Local tables, for local dev only.
+  # Remove this service when deploying to AWS.
   # ─────────────────────────────────────────────────────────────────────────────
-  backend:
-    build:
-      context: ./MoneyTrack_BE
-      dockerfile: Dockerfile
-    container_name: moneytrack-backend
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    container_name: dynamodb-admin
     ports:
-      - "8080:8080"
+      - "8001:8001"
+    environment:
+      DYNAMO_ENDPOINT: http://dynamodb-local:8000
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_REGION: ap-southeast-1
     depends_on:
       dynamodb-local:
         condition: service_healthy
-    environment:
-      PORT: 8080
-      AWS_REGION: ap-southeast-1
-      # Dummy credentials required by the AWS SDK when using DynamoDB Local.
-      # On AWS EC2/ECS, remove these and use an IAM role instead.
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
-      # Point the SDK at DynamoDB Local. Leave empty for real AWS DynamoDB.
-      DYNAMODB_ENDPOINT: ${DYNAMODB_ENDPOINT:-http://dynamodb-local:8000}
-      DYNAMODB_TABLE_USERS: ${DYNAMODB_TABLE_USERS:-moneytrack-users}
-      DYNAMODB_TABLE_CATEGORIES: ${DYNAMODB_TABLE_CATEGORIES:-moneytrack-categories}
-      DYNAMODB_TABLE_TRANSACTIONS: ${DYNAMODB_TABLE_TRANSACTIONS:-moneytrack-transactions}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Backend — Spring Boot 3.3.5 / Java 17
+  # ─────────────────────────────────────────────────────────────────────────────
+  # backend:
+  #   build:
+  #     context: ./MoneyTrack_BE
+  #     dockerfile: Dockerfile
+  #   container_name: moneytrack-backend
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     dynamodb-local:
+  #       condition: service_healthy
+  #   environment:
+  #     PORT: 8080
+  #     AWS_REGION: ap-southeast-1
+  #     # Dummy credentials required by the AWS SDK when using DynamoDB Local.
+  #     # On AWS EC2/ECS, remove these and use an IAM role instead.
+  #     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
+  #     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+  #     # Point the SDK at DynamoDB Local. Leave empty for real AWS DynamoDB.
+  #     DYNAMODB_ENDPOINT: ${DYNAMODB_ENDPOINT:-http://dynamodb-local:8000}
+  #     DYNAMODB_TABLE_USERS: ${DYNAMODB_TABLE_USERS:-moneytrack-users}
+  #     DYNAMODB_TABLE_CATEGORIES: ${DYNAMODB_TABLE_CATEGORIES:-moneytrack-categories}
+  #     DYNAMODB_TABLE_TRANSACTIONS: ${DYNAMODB_TABLE_TRANSACTIONS:-moneytrack-transactions}
+  #     JWT_SECRET: ${JWT_SECRET}
+  #     JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 60s
+  #   restart: unless-stopped
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Frontend — Next.js 15 / React 19
   # ─────────────────────────────────────────────────────────────────────────────
-  frontend:
-    build:
-      context: ./MoneyTrack_FE
-      dockerfile: Dockerfile
-    container_name: moneytrack-frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      backend:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      # Public API URL — accessible from the browser (must be reachable from client)
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
-    restart: unless-stopped
+  # frontend:
+  #   build:
+  #     context: ./MoneyTrack_FE
+  #     dockerfile: Dockerfile
+  #   container_name: moneytrack-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     backend:
+  #       condition: service_healthy
+  #   environment:
+  #     NODE_ENV: production
+  #     # Public API URL — accessible from the browser (must be reachable from client)
+  #     NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+  #   restart: unless-stopped
