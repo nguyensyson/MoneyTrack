@@ -56,6 +56,7 @@ jobs:
     permissions:
       id-token: write   # Request OIDC JWT
       contents: read    # Checkout source
+      checks: write     # Let mikepenz/action-junit-report create a check run
 
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
@@ -75,9 +76,9 @@ jobs:
           cache: "maven"
 
       # ── 3. Run backend tests ─────────────────────────────────────────────────
-      # Tests run against DynamoDB Local spun up as a service container.
-      # The smoke test (MoneyTrackBeApplicationTests) is excluded here because
-      # it requires a full Spring context with real AWS credentials.
+      # The smoke test (MoneyTrackBeApplicationTests) is excluded via the
+      # maven-surefire-plugin config in pom.xml because it boots a full Spring
+      # context that needs a real DynamoDB endpoint, which CI doesn't provide.
       # Unit tests and property-based tests (jqwik) run without AWS.
       - name: Run backend tests
         working-directory: MoneyTrack_BE

@@ -153,6 +153,16 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- Requires a full Spring context with real AWS/DynamoDB access; not runnable in CI without DynamoDB Local. -->
+                    <excludes>
+                        <exclude>**/MoneyTrackBeApplicationTests.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
