@@ -19,11 +19,6 @@ output "private_subnet_ids" {
   value       = module.network.private_subnet_ids
 }
 
-output "nat_gateway_public_ips" {
-  description = "Elastic IPs of the NAT Gateways"
-  value       = module.network.nat_gateway_public_ips
-}
-
 # --- ECR / ECS ---
 
 output "ecr_repository_url" {
