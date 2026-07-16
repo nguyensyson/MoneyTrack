@@ -162,44 +162,49 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false  # Disable SBOM provenance to keep manifest simple
 
-      # ── 9-11. ECS deploy steps — TEMPORARILY DISABLED ───────────────────────
-      # First CI/CD runs should only push the image to ECR. Re-enable these
-      # steps (remove the # comments) once the image is confirmed in ECR and
-      # the ECS service/task definition are ready to receive it.
-      # - name: Download current ECS task definition
-      #   run: |
-      #     aws ecs describe-task-definition \
-      #       --task-definition "${{ env.ECS_TASK_FAMILY }}" \
-      #       --query taskDefinition \
-      #       > /tmp/task-definition.json
-      #
-      # - name: Render updated ECS task definition
-      #   id: render-task-def
-      #   uses: aws-actions/amazon-ecs-render-task-definition@v1
-      #   with:
-      #     task-definition: /tmp/task-definition.json
-      #     container-name: ${{ env.CONTAINER_NAME }}
-      #     image: ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}
-      #
-      # - name: Deploy to ECS Fargate
-      #   uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-      #   with:
-      #     task-definition: ${{ steps.render-task-def.outputs.task-definition }}
-      #     service: ${{ env.ECS_SERVICE }}
-      #     cluster: ${{ env.ECS_CLUSTER }}
-      #     wait-for-service-stability: true
-      #     wait-for-minutes: 10
-      #
-      # - name: Verify ECS service is stable
-      #   run: |
-      #     echo "Checking ECS service status..."
-      #     aws ecs describe-services \
-      #       --cluster "${{ env.ECS_CLUSTER }}" \
-      #       --services "${{ env.ECS_SERVICE }}" \
-      #       --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}' \
-      #       --output table
-      #
-      #     echo "Deployed image: ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}"
+      # ── 9. Render new ECS task definition ────────────────────────────────────
+      # Downloads the current task definition and replaces only the image URI.
+      # All other settings (CPU, memory, secrets, env vars) remain unchanged.
+      - name: Download current ECS task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ env.ECS_TASK_FAMILY }}" \
+            --query taskDefinition \
+            > /tmp/task-definition.json
+
+      - name: Render updated ECS task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: /tmp/task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}
+
+      # ── 10. Deploy to ECS ────────────────────────────────────────────────────
+      # Registers the new task definition revision and updates the ECS service.
+      # Waits for the service to reach a stable state (all tasks healthy).
+      # The ECS service has deployment_circuit_breaker enabled — it will
+      # automatically roll back if the new tasks fail health checks.
+      - name: Deploy to ECS Fargate
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 10
+
+      # ── 11. Verify deployment ────────────────────────────────────────────────
+      - name: Verify ECS service is stable
+        run: |
+          echo "Checking ECS service status..."
+          aws ecs describe-services \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}" \
+            --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}' \
+            --output table
+
+          echo "Deployed image: ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}"
 
   # ─────────────────────────────────────────────────────────────────────────────
   # JOB 2 — Notify on failure
